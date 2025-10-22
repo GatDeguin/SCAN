@@ -3,1786 +3,731 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mini App Inventario · Escáner + CSV/XLSX</title>
-    <style>
-    :root{
-      --bg: #020518;
-      --bg-alt: #0c1124;
-      --surface: rgba(14, 20, 40, 0.9);
-      --surface-strong: rgba(16, 24, 46, 0.95);
-      --border: rgba(142, 167, 255, 0.18);
-      --brand: #6ef7d5;
-      --accent: #8ea7ff;
-      --text: #f5f7ff;
-      --text-muted: #9fa9c6;
+  <title>Scan Control · Inventario ágil</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #05070f;
+      --bg-soft: #0b1020;
+      --surface: #11182d;
+      --surface-high: rgba(21, 30, 54, 0.9);
+      --border: rgba(120, 148, 255, 0.22);
+      --text: #eef2ff;
+      --text-soft: rgba(227, 233, 255, 0.72);
+      --accent: #7cf1d4;
+      --accent-strong: #53c2ff;
       --danger: #ff6b81;
-      --warn: #f9b24e;
-      --success: #38d996;
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --radius-sm: 12px;
+      --warn: #ffb347;
+      --success: #5dec9a;
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
       --space-xs: 6px;
-      --space-sm: clamp(8px, 1.8vw, 12px);
-      --space: clamp(12px, 2.4vw, 20px);
-      --space-lg: clamp(18px, 3vw, 26px);
-      --space-xl: clamp(24px, 5vw, 34px);
-      --font-xs: clamp(11px, 1.2vw, 12px);
-      --font-sm: clamp(12px, 1.6vw, 13px);
-      --font-md: clamp(14px, 1.9vw, 16px);
-      --font-lg: clamp(18px, 3.2vw, 22px);
-      --font-xl: clamp(22px, 5vw, 30px);
-      --shadow-soft: 0 18px 45px rgba(8, 10, 25, 0.55);
-      --shadow-raised: 0 12px 32px rgba(6, 10, 30, 0.45);
-      --transition: 160ms ease;
+      --space-sm: 12px;
+      --space-md: 18px;
+      --space-lg: 28px;
+      --space-xl: 42px;
+      --shadow-soft: 0 18px 38px rgba(5, 8, 20, 0.6);
+      --shadow-strong: 0 22px 60px rgba(5, 8, 20, 0.7);
+      --font-xs: clamp(11px, 1.4vw, 12px);
+      --font-sm: clamp(12px, 1.6vw, 14px);
+      --font-md: clamp(14px, 2vw, 16px);
+      --font-lg: clamp(18px, 3.4vw, 22px);
+      --font-xl: clamp(26px, 5vw, 34px);
+      --transition: 180ms ease;
     }
-    @media (prefers-color-scheme: light){
-      :root{
-        --bg: #eef1ff;
-        --bg-alt: #f7f8ff;
-        --surface: rgba(255,255,255,0.92);
-        --surface-strong: rgba(255,255,255,0.96);
-        --border: rgba(71, 91, 168, 0.18);
-        --text: #0d1538;
-        --text-muted: #53608c;
-      }
-      body{
-        color-scheme: light dark;
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        color-scheme: light;
+        --bg: #f4f6ff;
+        --bg-soft: #edf0ff;
+        --surface: rgba(255, 255, 255, 0.82);
+        --surface-high: rgba(255, 255, 255, 0.9);
+        --border: rgba(90, 112, 180, 0.18);
+        --text: #0f172a;
+        --text-soft: rgba(15, 23, 42, 0.65);
+        --shadow-soft: 0 16px 30px rgba(15, 23, 42, 0.12);
+        --shadow-strong: 0 32px 60px rgba(15, 23, 42, 0.16);
       }
     }
-    *{box-sizing:border-box;}
-    html,body{height:100%;}
-    body{
-      margin:0;
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      color:var(--text);
-      background:
-        radial-gradient(1600px 800px at -10% 0%, rgba(111,134,255,0.22), transparent 55%),
-        radial-gradient(1300px 720px at 110% 5%, rgba(122,240,216,0.18), transparent 55%),
-        var(--bg);
-      line-height:1.55;
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(1400px 900px at -10% 0%, rgba(124, 241, 212, 0.08), transparent 60%),
+                  radial-gradient(1200px 720px at 110% 6%, rgba(83, 194, 255, 0.12), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
-    body::before{
-      content:'';
-      position:fixed;
-      inset:0;
-      pointer-events:none;
-      background: linear-gradient(120deg, rgba(255,255,255,0.06), transparent 45%),
-                  radial-gradient(900px 600px at 50% -240px, rgba(132,159,255,0.22), transparent 65%);
-      mix-blend-mode:soft-light;
-      opacity:0.65;
+
+    a { color: inherit; }
+
+    .app {
+      min-height: 100dvh;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: clamp(20px, 5vw, 48px) clamp(16px, 6vw, 60px) clamp(90px, 10vw, 120px);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
     }
-    a{color:inherit;}
-    .app{
-      position:relative;
-      min-height:100dvh;
-      max-width:1200px;
-      margin:0 auto;
-      padding: clamp(20px, 4vw, 48px) clamp(16px, 5vw, 60px) clamp(120px, 18vw, 140px);
-      display:flex;
-      flex-direction:column;
-      gap:var(--space-lg);
+
+    .surface {
+      background: var(--surface-high);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(32px);
+      -webkit-backdrop-filter: blur(32px);
     }
-    @media (max-width:900px){
-      .app{
-        padding: clamp(16px, 4vw, 28px) clamp(14px, 5vw, 30px) calc(140px + env(safe-area-inset-bottom));
+
+    .header {
+      padding: clamp(18px, 3vw, 32px);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+    }
+
+    .brand {
+      display: flex;
+      gap: var(--space-sm);
+      align-items: center;
+      min-width: 0;
+    }
+
+    .brand-logo {
+      width: clamp(44px, 8vw, 58px);
+      height: clamp(44px, 8vw, 58px);
+      border-radius: 22px;
+      background: linear-gradient(135deg, rgba(124, 241, 212, 0.8), rgba(83, 194, 255, 0.75));
+      display: grid;
+      place-items: center;
+      color: #041a18;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: var(--font-xl);
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--text-soft);
+      font-size: var(--font-sm);
+    }
+
+    .header-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: var(--font-sm);
+      color: inherit;
+    }
+
+    .badge-muted {
+      color: var(--text-soft);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .badge.ok {
+      border-color: rgba(93, 236, 154, 0.6);
+      background: rgba(93, 236, 154, 0.18);
+      color: #052716;
+    }
+
+    .badge.bad {
+      border-color: rgba(255, 107, 129, 0.6);
+      background: rgba(255, 107, 129, 0.2);
+      color: #30040f;
+    }
+
+    .layout {
+      display: grid;
+      gap: var(--space-lg);
+    }
+
+    @media (min-width: 1100px) {
+      .layout {
+        grid-template-columns: minmax(340px, 360px) minmax(0, 1fr);
       }
     }
-    .topbar,
-    .panel{
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:var(--radius-lg);
-      box-shadow:var(--shadow-soft);
-      backdrop-filter:blur(26px);
-      -webkit-backdrop-filter:blur(26px);
+
+    .panel {
+      padding: clamp(18px, 3vw, 30px);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
     }
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
-      .topbar,
-      .panel{
-        background:var(--surface-strong);
+
+    .panel h2 {
+      margin: 0 0 6px;
+      font-size: var(--font-lg);
+      font-weight: 600;
+    }
+
+    .panel p {
+      margin: 0;
+      font-size: var(--font-sm);
+      color: var(--text-soft);
+    }
+
+    .control-grid {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .control-group {
+      border-radius: var(--radius-lg);
+      padding: var(--space-md);
+      background: rgba(10, 16, 32, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-sm);
+      color: inherit;
+      font-size: var(--font-md);
+      font-weight: 600;
+      padding: 12px 18px;
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border var(--transition);
+    }
+
+    .button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .button.primary {
+      background: linear-gradient(135deg, rgba(124, 241, 212, 0.32), rgba(83, 194, 255, 0.24));
+      border-color: rgba(124, 241, 212, 0.45);
+      color: #06221a;
+    }
+
+    .button.warn {
+      background: linear-gradient(135deg, rgba(255, 179, 71, 0.35), rgba(255, 213, 102, 0.24));
+      border-color: rgba(255, 179, 71, 0.4);
+      color: #2a1500;
+    }
+
+    .button.danger {
+      background: linear-gradient(135deg, rgba(255, 107, 129, 0.32), rgba(255, 152, 173, 0.2));
+      border-color: rgba(255, 107, 129, 0.45);
+      color: #2b030f;
+    }
+
+    .button.ghost {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    input[type="text"], input[type="number"], select, textarea {
+      width: 100%;
+      background: rgba(9, 13, 24, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: var(--font-md);
+      color: inherit;
+      font-family: inherit;
+      transition: border var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+
+    input:focus-visible, select:focus-visible, textarea:focus-visible, .button:focus-visible {
+      outline: 2px solid var(--accent-strong);
+      outline-offset: 2px;
+    }
+
+    label {
+      font-size: var(--font-sm);
+      color: var(--text-soft);
+      font-weight: 500;
+    }
+
+    .drop-zone {
+      position: relative;
+      border: 1.6px dashed rgba(255, 255, 255, 0.18);
+      border-radius: var(--radius-lg);
+      padding: clamp(28px, 5vw, 40px);
+      text-align: center;
+      color: var(--text-soft);
+      background: rgba(14, 18, 30, 0.5);
+      transition: color var(--transition), border var(--transition), transform var(--transition), background var(--transition);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .drop-zone.drag {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(124, 241, 212, 0.08);
+      transform: translateY(-2px);
+    }
+
+    .drop-zone strong {
+      font-size: var(--font-md);
+      color: inherit;
+    }
+
+    .workspace {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    @media (min-width: 900px) {
+      .workspace {
+        grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
       }
     }
-    .topbar{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:var(--space);
-      padding:var(--space);
-    }
-    .topbar__brand{
-      display:flex;
-      align-items:center;
-      gap:var(--space-sm);
-      min-width:0;
-    }
-    .topbar svg{
-      width:40px;
-      height:40px;
-      flex-shrink:0;
-    }
-    .topbar h1{
-      margin:0;
-      font-size:var(--font-xl);
-      letter-spacing:-0.01em;
-    }
-    .subtitle{
-      margin:0;
-      font-size:var(--font-sm);
-      color:var(--text-muted);
-    }
-    .stats{
-      display:flex;
-      align-items:center;
-      gap:var(--space-sm);
-      flex-wrap:wrap;
-      justify-content:flex-end;
-    }
-    .app-grid{
-      display:flex;
-      flex-direction:column;
-      gap:var(--space-lg);
-    }
-    .control-panel{
-      padding:var(--space);
-      display:flex;
-      flex-direction:column;
-      gap:var(--space);
-    }
-    .control-grid{
-      display:grid;
-      gap:var(--space);
-    }
-    @media (min-width:980px){
-      .control-grid{
-        grid-template-columns:1.1fr 1fr 0.9fr;
-      }
-    }
-    .control-block{
-      display:flex;
-      flex-direction:column;
-      gap:var(--space-sm);
-      padding:var(--space);
-      border-radius:var(--radius-md);
-      background:rgba(12,18,36,0.55);
-      border:1px solid rgba(255,255,255,0.08);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
-    }
-    .control-block h2{
-      margin:0;
-      font-size:var(--font-lg);
-      font-weight:600;
-    }
-    .control-block p{
-      margin:0;
-    }
-    .control-block .row{
-      flex-wrap:wrap;
-    }
-    .workspace{
-      display:flex;
-      flex-direction:column;
-      gap:var(--space-lg);
-    }
-    .section{
-      display:flex;
-      flex-direction:column;
-      gap:var(--space);
-    }
-    .section.panel{
-      padding:var(--space);
-    }
-    .section-title{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:var(--space-sm);
-      flex-wrap:wrap;
-    }
-    .section-title h2{
-      margin:0;
-      font-size:var(--font-lg);
-      font-weight:600;
-    }
-    .section-title p{
-      margin:0;
-      font-size:var(--font-sm);
-      color:var(--text-muted);
-    }
-    input[type="file"]{display:none;}
-    .file-drop{
-      border:1.6px dashed rgba(255,255,255,0.22);
-      border-radius:var(--radius-md);
-      padding:calc(var(--space) + 4px);
-      text-align:center;
-      color:var(--text-muted);
-      background:rgba(12,18,36,0.35);
-      transition:border var(--transition), color var(--transition), background var(--transition), transform var(--transition);
-    }
-    .file-drop:focus-visible{
-      outline:2px solid var(--accent);
-      outline-offset:2px;
-    }
-    .file-drop.drag{
-      border-color:var(--brand);
-      color:var(--brand);
-      background:rgba(110,247,213,0.08);
-      transform:translateY(-1px);
-    }
-    .field-grid{
-      display:grid;
-      gap:var(--space);
-    }
-    @media (min-width:640px){
-      .field-grid{
-        grid-template-columns:repeat(2,minmax(0,1fr));
-      }
-    }
-    label{
-      font-size:var(--font-sm);
-      font-weight:500;
-      color:var(--text-muted);
-    }
-    select,
-    input[type="text"],
-    input[type="number"],
-    textarea{
-      width:100%;
-      padding:12px 14px;
-      font-size:var(--font-md);
-      font-family:inherit;
-      color:var(--text);
-      background:rgba(9,14,32,0.8);
-      border:1px solid rgba(255,255,255,0.08);
-      border-radius:var(--radius-sm);
-      transition:border var(--transition), box-shadow var(--transition), background var(--transition);
-    }
-    select:focus-visible,
-    input:focus-visible,
-    textarea:focus-visible{
-      border-color:var(--accent);
-      box-shadow:0 0 0 2px rgba(142,167,255,0.35);
-      outline:none;
-    }
-    input::placeholder,
-    textarea::placeholder{
-      color:rgba(255,255,255,0.45);
-    }
-    input[readonly]{
-      color:var(--text-muted);
-    }
-    .button{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:10px;
-      padding:12px 16px;
-      min-height:46px;
-      font-size:var(--font-md);
-      font-weight:600;
-      border-radius:var(--radius-sm);
-      border:1px solid rgba(255,255,255,0.08);
-      background:linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
-      color:inherit;
-      cursor:pointer;
-      transition:transform var(--transition), box-shadow var(--transition), background var(--transition), border var(--transition);
-      text-decoration:none;
-    }
-    .button:hover{
-      transform:translateY(-1px);
-      box-shadow:var(--shadow-raised);
-    }
-    .button:focus-visible{
-      outline:2px solid var(--accent);
-      outline-offset:2px;
-    }
-    .button:active{
-      transform:translateY(0);
-    }
-    .button:disabled{
-      opacity:.55;
-      cursor:not-allowed;
-      box-shadow:none;
-    }
-    .button.full{width:100%;}
-    .button.primary{
-      background:linear-gradient(180deg, rgba(110,247,213,0.32), rgba(110,247,213,0.12));
-      border-color:rgba(110,247,213,0.48);
-      color:#041a16;
-    }
-    .button.warn{
-      background:linear-gradient(180deg, rgba(249,178,78,0.32), rgba(249,178,78,0.12));
-      border-color:rgba(249,178,78,0.45);
-      color:#2c1603;
-    }
-    .button.danger{
-      background:linear-gradient(180deg, rgba(255,107,129,0.32), rgba(255,107,129,0.12));
-      border-color:rgba(255,107,129,0.5);
-      color:#2e030d;
-    }
-    .button.ghost{
-      background:rgba(255,255,255,0.04);
-    }
-    .button.scan-trigger{
-      background:rgba(8,12,30,0.72);
-      border-color:rgba(255,255,255,0.14);
-      backdrop-filter:blur(12px);
-      -webkit-backdrop-filter:blur(12px);
-    }
-    .row{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:var(--space-sm);
-      flex-wrap:wrap;
-    }
-    .row.fit{justify-content:flex-start;}
-    .row.tight{gap:var(--space-sm);}
-    .row.compact{gap:var(--space-xs);}
-    .stack{
-      display:flex;
-      flex-direction:column;
-      gap:var(--space-sm);
-    }
-    .code-field{flex:1; min-width:min(260px, 100%);}
-    .action-block{width:min(340px,100%);}
-    @media (max-width:720px){
-      .action-block{width:100%;}
-    }
-    .kbd{
-      font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
-      background:rgba(12,18,40,0.72);
-      border:1px solid rgba(255,255,255,0.09);
-      border-radius:8px;
-      padding:3px 8px;
-      font-size:var(--font-xs);
-    }
-    .tip{
-      font-size:var(--font-sm);
-      color:var(--text-muted);
-    }
-    .tip strong{color:inherit;}
-    .tip.status.success{color:var(--success);}
-    .tip.status.error{color:var(--danger);}
-    .tip.status.warn{color:var(--warn);}
-    .pill,
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:6px 12px;
-      border-radius:999px;
-      font-size:var(--font-sm);
-      border:1px solid rgba(255,255,255,0.14);
-      background:rgba(255,255,255,0.06);
-      color:inherit;
-    }
-    .pill.muted{
-      background:rgba(255,255,255,0.05);
-      border-color:rgba(255,255,255,0.1);
-      color:var(--text-muted);
-    }
-    .chip.ok{
-      border-color:rgba(56,217,150,0.5);
-      background:rgba(56,217,150,0.18);
-      color:#06291a;
-    }
-    .chip.bad{
-      border-color:rgba(255,107,129,0.5);
-      background:rgba(255,107,129,0.2);
-      color:#2e0a11;
-    }
-    .video-wrap{
-      position:relative;
-      border-radius:var(--radius-lg);
-      overflow:hidden;
-      background:rgba(7,12,28,0.75);
-      border:1px solid rgba(255,255,255,0.08);
-      aspect-ratio:3 / 4;
-      display:flex;
-    }
-    @media (min-width:720px){
-      .video-wrap{aspect-ratio:16 / 9;}
-    }
-    video{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      filter:saturate(1.08) contrast(1.04);
-    }
-    .scan-action{
-      position:absolute;
-      top:14px;
-      right:14px;
-      display:flex;
-      gap:10px;
-    }
-    .scan-status{
-      position:absolute;
-      left:16px;
-      bottom:16px;
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
-    .pulse{
-      width:12px;
-      height:12px;
-      border-radius:50%;
-      background:var(--warn);
-      box-shadow:0 0 0 0 rgba(249,178,78,0.45);
-      animation:pulse 1.8s ease-in-out infinite;
-    }
-    .pulse.on{
-      background:var(--brand);
-      box-shadow:0 0 0 0 rgba(110,247,213,0.45);
-    }
-    @keyframes pulse{
-      0%{transform:scale(0.9); box-shadow:0 0 0 0 rgba(255,255,255,0.28);}
-      60%{transform:scale(1); box-shadow:0 0 0 14px rgba(255,255,255,0);}
-      100%{box-shadow:0 0 0 0 rgba(255,255,255,0);}
-    }
-    .data-area{
-      padding:var(--space);
-      display:grid;
-      gap:var(--space);
-    }
-    .result{
-      display:grid;
-      gap:var(--space);
-    }
-    @media (min-width:1024px){
-      .result{
-        grid-template-columns:1.05fr 0.95fr;
-      }
-    }
-    .card{
-      border-radius:var(--radius-lg);
-      background:rgba(11,16,36,0.78);
-      border:1px solid rgba(255,255,255,0.08);
-      padding:var(--space);
-      display:flex;
-      flex-direction:column;
-      gap:var(--space);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
-    }
-    .table-scroll{
-      overflow:auto;
-      border-radius:calc(var(--radius-md) - 4px);
-      border:1px solid rgba(255,255,255,0.05);
-      background:rgba(4,8,20,0.65);
-      max-height:42dvh;
-    }
-    .table-scroll table{
-      width:100%;
-      border-collapse:collapse;
-      min-width:100%;
-    }
-    .table-scroll th,
-    .table-scroll td{
-      font-size:var(--font-sm);
-      text-align:left;
-      padding:12px 14px;
-      border-bottom:1px solid rgba(255,255,255,0.05);
-      white-space:nowrap;
-    }
-    .table-scroll tr:hover{
-      background:rgba(142,167,255,0.12);
-    }
-    .table-scroll::-webkit-scrollbar{
-      height:8px;
-      width:8px;
-    }
-    .table-scroll::-webkit-scrollbar-thumb{
-      background:rgba(142,167,255,0.28);
-      border-radius:999px;
-    }
-    .inventory-preview{
-      max-height:28dvh;
-    }
-    .log{
-      display:flex;
-      flex-direction:column;
-      gap:var(--space);
-    }
-    .log .table-scroll{
-      max-height:50dvh;
-    }
-    .log tr.added{
-      animation:glow .9s ease-out;
-    }
-    @keyframes glow{
-      0%{background:rgba(110,247,213,0.24);}
-      100%{background:transparent;}
-    }
-    .inventory-drawer{
-      position:fixed;
-      inset:0;
-      display:flex;
-      justify-content:flex-end;
-      padding:clamp(16px, 6vw, 32px);
-      background:rgba(2,5,24,0.6);
-      backdrop-filter:blur(22px);
-      -webkit-backdrop-filter:blur(22px);
-      z-index:90;
-      overflow:auto;
-    }
-    .inventory-drawer__panel{
-      width:min(420px, 100%);
-      max-height:100%;
-      overflow:auto;
-      display:flex;
-      flex-direction:column;
-      gap:var(--space);
-    }
-    .inventory-drawer__panel .drawer-header{
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:var(--space-sm);
-    }
-    .inventory-drawer__panel .drawer-header h2{
-      margin:0;
-      font-size:var(--font-lg);
-      font-weight:600;
-    }
-    .inventory-drawer__panel .drawer-body{
-      display:flex;
-      flex-direction:column;
-      gap:var(--space);
-    }
-    @media (max-width:720px){
-      .inventory-drawer{
-        justify-content:center;
-        padding:clamp(12px, 4vw, 24px);
-      }
-      .inventory-drawer__panel{
-        width:min(520px, 100%);
-      }
-    }
-    @media (max-width:560px){
-      .inventory-drawer{
-        padding:0;
-      }
-      .inventory-drawer__panel{
-        border-radius:0;
-      }
-    }
-    .hidden{display:none!important;}
-    .mobile-actions{
-      position:fixed;
-      left:0;
-      right:0;
-      bottom:0;
-      z-index:30;
-      padding:12px clamp(16px, 6vw, 40px) calc(12px + env(safe-area-inset-bottom));
-      display:flex;
-      gap:12px;
-      justify-content:center;
-      align-items:center;
-      background:linear-gradient(180deg, rgba(3,7,20,0), rgba(3,7,20,0.92) 35%, rgba(3,7,20,1) 90%);
-      backdrop-filter:blur(22px);
-      -webkit-backdrop-filter:blur(22px);
-      border-top:1px solid rgba(255,255,255,0.08);
-    }
-    .mobile-actions .button{flex:1;}
-    @media (min-width:980px){
-      .mobile-actions{display:none;}
-    }
-    footer{
-      font-size:var(--font-sm);
-      color:var(--text-muted);
-      text-align:center;
-      padding-bottom:env(safe-area-inset-bottom);
-    }
-    footer strong{color:var(--text);}
-    details{
-      border-radius:var(--radius-md);
-      background:rgba(12,18,38,0.6);
-      border:1px solid rgba(255,255,255,0.08);
-      padding:var(--space);
-    }
-    details summary{
-      cursor:pointer;
-      list-style:none;
-      display:flex;
-      align-items:center;
-      gap:var(--space-sm);
-      font-weight:600;
-      font-size:var(--font-md);
-    }
-    details summary::-webkit-details-marker{display:none;}
-    details[open]{background:rgba(12,18,38,0.72);}
-    @media (prefers-reduced-motion: reduce){
-      *{animation:none!important; transition:none!important;}
+
+    .video-shell {
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      position: relative;
+      background: rgba(7, 11, 22, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      aspect-ratio: 3 / 4;
+      display: flex;
+    }
+
+    @media (min-width: 720px) {
+      .video-shell { aspect-ratio: 16 / 9; }
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: saturate(1.08) contrast(1.04);
+    }
+
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      padding: var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .scan-top {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-sm);
+    }
+
+    .scan-bottom {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .pulse {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--warn);
+      box-shadow: 0 0 0 0 rgba(255, 179, 71, 0.5);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    .pulse.on {
+      background: var(--accent);
+      box-shadow: 0 0 0 0 rgba(124, 241, 212, 0.4);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25); }
+      60% { transform: scale(1); box-shadow: 0 0 0 16px rgba(255, 255, 255, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+    }
+
+    .data-panels {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .card {
+      border-radius: var(--radius-lg);
+      background: rgba(10, 14, 26, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .card strong { font-size: var(--font-md); }
+
+    .card-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .table-scroll {
+      overflow: auto;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      max-height: 320px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 100%;
+      font-size: var(--font-sm);
+    }
+
+    th, td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      text-align: left;
+    }
+
+    th {
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    tr.added {
+      animation: rowIn 260ms ease;
+    }
+
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hidden { display: none !important; }
+
+    .hint {
+      font-size: var(--font-sm);
+      color: var(--text-soft);
+    }
+
+    .kbd {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+      background: rgba(15, 20, 32, 0.8);
+      padding: 4px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: var(--font-xs);
+    }
+
+    .status {
+      font-size: var(--font-sm);
+      color: var(--text-soft);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status.success { color: var(--success); }
+    .status.error { color: var(--danger); }
+    .status.warn { color: var(--warn); }
+
+    footer {
+      text-align: center;
+      font-size: var(--font-sm);
+      color: var(--text-soft);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    footer strong { color: var(--text); }
+
+    .drawer {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 20, 0.7);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      display: flex;
+      justify-content: flex-end;
+      padding: clamp(16px, 4vw, 32px);
+      z-index: 40;
+    }
+
+    .drawer__panel {
+      width: min(440px, 100%);
+      background: var(--surface-high);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-strong);
+      padding: clamp(18px, 3vw, 28px);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    @media (max-width: 640px) {
+      .drawer { justify-content: center; padding: 0; }
+      .drawer__panel { width: 100%; border-radius: 0; }
+    }
+
+    details {
+      border-radius: var(--radius-lg);
+      background: rgba(12, 16, 30, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: var(--space-md);
+    }
+
+    details summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-weight: 600;
+    }
+
+    details summary::-webkit-details-marker { display: none; }
+
+    .mobile-actions {
+      display: none;
+      position: sticky;
+      bottom: 0;
+      margin-top: auto;
+      gap: var(--space-sm);
+      padding-top: var(--space-sm);
+    }
+
+    @media (max-width: 900px) {
+      .mobile-actions { display: flex; flex-direction: column; }
+      .button.full { width: 100%; }
     }
   </style>
 </head>
 <body>
   <div class="app">
-    <header class="topbar panel">
-      <div class="topbar__brand">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M12 2l2.3 4.7L19 7.3l-3.5 3.4.8 4.9L12 13.8l-4.3 1.8.8-4.9L5 7.3l4.7-.6L12 2z" stroke="url(#g1)" stroke-width="1.3"/>
-          <defs><linearGradient id="g1" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#7cf2d3"/><stop offset="1" stop-color="#9aa8ff"/></linearGradient></defs>
-        </svg>
-        <div class="stack">
-          <h1>Mini App Inventario</h1>
-          <p class="subtitle">Escáner portátil para control de stock y depósitos móviles.</p>
+    <header class="header surface" aria-label="Estado general">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">SC</div>
+        <div>
+          <h1>Scan Control</h1>
+          <p>Controlá inventarios con cámara o códigos manuales en segundos.</p>
         </div>
       </div>
-      <div class="stats">
-        <span class="pill" id="invCount" aria-live="polite">0 ítems</span>
-        <span class="pill muted" id="keyIndicator" aria-live="polite">Clave: —</span>
+      <div class="header-metrics">
+        <span id="invCount" class="badge" aria-live="polite">0 ítems</span>
+        <span id="keyIndicator" class="badge badge-muted" aria-live="polite">Clave: —</span>
       </div>
     </header>
 
-    <div class="app-grid">
-      <section class="panel control-panel" aria-label="Panel principal">
+    <div class="layout">
+      <section class="panel surface" aria-label="Controles principales">
         <div class="control-grid">
-          <div class="control-block">
-            <div class="section-title">
-              <div class="stack">
-                <h2>Escáner</h2>
-                <p>Activá la cámara para detectar códigos al instante.</p>
-              </div>
-              <span class="chip" id="apiStatus">API: detectando…</span>
-            </div>
-            <div class="row fit tight">
+          <article class="control-group">
+            <header>
+              <h2>Escáner</h2>
+              <p>Activa la cámara del dispositivo y detectá códigos al instante.</p>
+            </header>
+            <div class="status" id="apiStatus">API: detectando…</div>
+            <div class="button-row">
               <button class="button primary" id="startBtn" type="button">Iniciar cámara</button>
               <button class="button warn" id="stopBtn" type="button" disabled>Detener</button>
               <button class="button" id="flashBtn" type="button" disabled>Flash</button>
               <button class="button" id="switchBtn" type="button" disabled>Cambiar</button>
             </div>
-          </div>
-          <div class="control-block">
-            <h2>Ingreso manual</h2>
-            <p class="tip">Ideal para códigos únicos o cuando la cámara no está disponible.</p>
-            <div class="row fit tight">
-              <input id="manualInput" type="text" placeholder="Pegá o escribí un código y Enter" aria-label="Ingreso manual" />
+          </article>
+
+          <article class="control-group">
+            <header>
+              <h2>Ingreso manual</h2>
+              <p>Ideal cuando el código es único o no podés usar la cámara.</p>
+            </header>
+            <label for="manualInput">Código</label>
+            <div class="button-row">
+              <input id="manualInput" type="text" placeholder="Ingresá o pegá un código y presioná Enter" aria-label="Ingreso manual" />
               <button class="button" id="manualBtn" type="button">OK</button>
             </div>
-            <div class="tip">Atajo: <span class="kbd">Enter</span> confirma. <span class="kbd">Ctrl/Cmd + C</span> conforma.</div>
-          </div>
-          <div class="control-block">
-            <h2>Inventario y acciones</h2>
-            <p class="tip">Administrá el inventario importado y exportá los conformados.</p>
-            <button class="button ghost full" id="inventoryToggle" type="button" aria-controls="inventoryDrawer" aria-expanded="false">Administrar inventario</button>
-            <div class="row tight">
+            <p class="hint">Atajos: <span class="kbd">Enter</span> confirma · <span class="kbd">Ctrl/Cmd + C</span> conforma de inmediato.</p>
+          </article>
+
+          <article class="control-group">
+            <header>
+              <h2>Inventario</h2>
+              <p>Importá un archivo CSV/Excel, elegí la clave y gestioná el stock.</p>
+            </header>
+            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" hidden />
+            <div class="drop-zone" id="drop" role="button" tabindex="0" aria-describedby="dropHelp">
+              <strong>Seleccioná o arrastrá inventario.csv / .xlsx</strong>
+              <span id="dropHelp" class="hint">El archivo queda sólo en este dispositivo. Nada se sube a la nube.</span>
+              <button class="button ghost" type="button">Buscar archivo</button>
+            </div>
+            <div class="button-row">
+              <button class="button ghost" id="inventoryToggle" type="button" aria-controls="inventoryDrawer" aria-expanded="false">Administrar inventario</button>
               <button class="button primary" id="exportBtn" type="button">Descargar "conformado.csv"</button>
               <button class="button danger" id="clearBtn" type="button">Limpiar conformados</button>
             </div>
-            <div class="tip status" id="inventoryStatus" aria-live="polite">Preparado para importar un inventario.</div>
-          </div>
+            <div class="status" id="inventoryStatus" aria-live="polite">Preparado para importar un inventario.</div>
+          </article>
         </div>
         <div class="mobile-actions" role="group" aria-label="Acciones rápidas">
-          <button class="button primary" id="confirmBtnMobile" type="button" disabled>Conformar</button>
-          <button class="button" id="exportBtnMobile" type="button">Descargar CSV</button>
+          <button class="button primary full" id="confirmBtnMobile" type="button" disabled>Conformar</button>
+          <button class="button ghost full" id="exportBtnMobile" type="button">Descargar CSV</button>
         </div>
       </section>
 
-      <main class="workspace">
-        <div class="panel video-wrap" aria-label="Visor de la cámara">
+      <main class="workspace" aria-label="Área de trabajo">
+        <section class="video-shell" aria-label="Visor de cámara">
           <video id="video" playsinline muted></video>
-          <div class="scan-action">
-            <button class="button scan-trigger" id="scanOnceBtn" type="button" disabled>Ejecutar lectura</button>
+          <div class="scan-overlay" aria-hidden="true">
+            <div class="scan-top">
+              <button class="button ghost" id="scanOnceBtn" type="button" disabled>Lectura única</button>
+            </div>
+            <div class="scan-bottom">
+              <div class="pulse" id="pulse"></div>
+              <span class="badge" id="scanLabel">Cámara inactiva</span>
+            </div>
           </div>
-          <div class="scan-status">
-            <div id="pulse" class="pulse" aria-hidden="true"></div>
-            <span id="scanLabel" class="pill">Cámara inactiva</span>
-          </div>
-        </div>
+        </section>
 
-        <div class="panel data-area">
-          <div class="result">
-            <div class="card details">
-              <div class="row tight">
-                <strong>Detalles del código</strong>
-                <span id="matchChip" class="chip" aria-live="polite">—</span>
+        <div class="data-panels">
+          <article class="card details">
+            <div class="card-header">
+              <strong>Detalles del código</strong>
+              <span id="matchChip" class="badge">—</span>
+            </div>
+            <div class="button-row">
+              <div style="flex:1; min-width: min(260px, 100%); display: flex; flex-direction: column; gap: 8px;">
+                <label for="detectedCode">Código detectado</label>
+                <input id="detectedCode" type="text" readonly />
               </div>
-              <div class="stack">
-                <div class="row fit tight">
-                  <div class="stack code-field">
-                    <label for="detectedCode">Código detectado</label>
-                    <input id="detectedCode" type="text" readonly />
-                  </div>
-                  <div class="stack action-block">
-                    <label>Acción</label>
-                    <div class="row fit compact">
-                      <button class="button primary" id="confirmBtn" type="button" disabled>Marcar como conformado</button>
-                      <button class="button ghost" id="copyBtn" type="button" title="Copiar código" disabled>Copiar</button>
-                    </div>
-                  </div>
-                </div>
-                <div id="detailTableWrap" class="stack">
-                  <label>Información asociada</label>
-                  <div class="tip" id="noData">Cargá un inventario y elegí la columna clave para ver detalles.</div>
-                  <div id="detailTable" class="table-scroll hidden">
-                    <table id="detailTbl"></table>
-                  </div>
+              <div style="width:min(320px,100%); display:flex; flex-direction:column; gap:8px;">
+                <label>Acción</label>
+                <div class="button-row">
+                  <button class="button primary" id="confirmBtn" type="button" disabled>Marcar como conformado</button>
+                  <button class="button ghost" id="copyBtn" type="button" title="Copiar código" disabled>Copiar</button>
                 </div>
               </div>
             </div>
-            <div class="card">
-              <div class="row tight">
-                <strong>Inventario (vista rápida)</strong>
-                <span class="pill" id="visibleCount">0 visibles</span>
-              </div>
-              <div class="table-scroll inventory-preview">
-                <table id="invTbl"></table>
+            <div id="detailTableWrap" class="card" style="gap: var(--space-sm); background: rgba(7, 11, 22, 0.6);">
+              <label>Información asociada</label>
+              <p class="hint" id="noData">Cargá un inventario y elegí la columna clave para ver detalles.</p>
+              <div id="detailTable" class="table-scroll hidden">
+                <table id="detailTbl"></table>
               </div>
             </div>
-          </div>
-          <div class="card log">
-            <div class="row tight">
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <strong>Inventario (vista rápida)</strong>
+              <span class="badge" id="visibleCount">0 visibles</span>
+            </div>
+            <div class="button-row">
+              <div style="flex:1; min-width: min(220px, 100%); display:flex; flex-direction:column; gap:8px;">
+                <label for="filterInput">Filtrar inventario</label>
+                <input id="filterInput" type="text" placeholder="Buscar por cualquier columna" />
+              </div>
+              <div style="width:min(220px,100%); display:flex; flex-direction:column; gap:8px;">
+                <label for="keySelect">Columna clave</label>
+                <select id="keySelect"></select>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table id="invTbl"></table>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
               <strong>Conformados</strong>
-              <span class="pill" id="confCount">0</span>
+              <span class="badge" id="confCount">0</span>
             </div>
             <div class="table-scroll">
               <table id="confTbl"></table>
             </div>
-          </div>
-        </div>
+          </article>
 
-        <section class="panel section stack">
-          <details>
-            <summary>🧪 Pruebas rápidas (CSV/Export) – abrir para ejecutar</summary>
-            <div class="stack">
-              <button class="button" id="btnTestCSV" type="button">Test parser CSV</button>
-              <button class="button" id="btnTestExport" type="button">Test export CSV</button>
-              <div class="tip">Los resultados se muestran en la consola del navegador y/o como descarga de un archivo de prueba.</div>
-            </div>
-          </details>
-        </section>
+          <section class="card">
+            <details>
+              <summary>🧪 Pruebas rápidas – abrir para ejecutar</summary>
+              <div class="button-row">
+                <button class="button ghost" id="btnTestCSV" type="button">Test parser CSV</button>
+                <button class="button ghost" id="btnTestExport" type="button">Test export CSV</button>
+              </div>
+              <p class="hint" id="autoLoadMsg">Los resultados se mostrarán en consola o como una descarga de ejemplo.</p>
+            </details>
+          </section>
+        </div>
       </main>
     </div>
 
-    <div id="inventoryDrawer" class="inventory-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="inventoryTitle" aria-hidden="true">
-      <div class="panel section stack inventory-drawer__panel">
-        <div class="drawer-header">
-          <div class="stack">
-            <h2 id="inventoryTitle">Inventario</h2>
-            <p class="subtitle">Importá tu archivo CSV o Excel para habilitar coincidencias instantáneas.</p>
-          </div>
-          <button class="button ghost" id="inventoryClose" type="button">Cerrar</button>
+    <footer>
+      <p><strong>Scan Control</strong> · Optimizado para operaciones móviles y depósitos desconectados.</p>
+    </footer>
+  </div>
+
+  <aside id="inventoryDrawer" class="drawer hidden" aria-hidden="true" role="dialog" aria-label="Inventario cargado">
+    <div class="drawer__panel">
+      <header class="card-header">
+        <div>
+          <h2 style="margin:0; font-size: var(--font-lg);">Inventario cargado</h2>
+          <p class="hint">Elegí la columna clave, filtrá y revisá los datos originales.</p>
         </div>
-        <div class="drawer-body">
-          <label class="button primary full" for="fileInput">Seleccionar archivo</label>
-          <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
-          <div id="drop" class="file-drop" tabindex="0">Arrastrá y soltá el archivo aquí</div>
-          <div class="field-grid">
-            <div class="stack">
-              <label for="keySelect">Columna clave</label>
-              <select id="keySelect"></select>
-            </div>
-            <div class="stack">
-              <label for="filterInput">Filtro rápido</label>
-              <input id="filterInput" type="text" placeholder="Buscar en inventario" />
-            </div>
-          </div>
-          <div class="tip status" id="autoLoadMsg" aria-live="polite">Preparado para importar un inventario.</div>
-          <div class="tip">Sugerencia: para uso 100% offline, preferí CSV (el soporte Excel usa un script CDN).</div>
-        </div>
+        <button class="button ghost" id="inventoryClose" type="button">Cerrar</button>
+      </header>
+      <label for="keySelectDrawer">Columna clave</label>
+      <select id="keySelectDrawer"></select>
+      <label for="filterInputDrawer">Filtro rápido</label>
+      <input id="filterInputDrawer" type="text" placeholder="Buscar registros" />
+      <div class="table-scroll" style="max-height: 50vh;">
+        <table id="invTblDrawer"></table>
       </div>
     </div>
+  </aside>
 
-    <footer>Hecho con ❤️ para flujos rápidos en depósito y control.</footer>
-  </div>
-  <!-- Script principal -->
-  <script>
-  const state = {
-    inventory: [],
-    columns: [],
-    key: null,
-    index: new Map(),
-    conformados: [],
-    cameraDevices: [],
-    currentDeviceId: null,
-    scanning: false,
-    detector: null,
-    fallbackReader: null,
-    fallbackErrorShown: false,
-    torchOn: false,
-    lastScan: { code: null, time: 0 },
-    inventoryName: null,
-    exportDelimiter: ';',
-  };
-
-  const BARCODE_FORMATS = ['code_128','ean_13','ean_8','upc_a','upc_e','code_39','code_93','itf','codabar','qr_code','data_matrix','pdf417'];
-  const ZXING_FORMAT_MAP = {
-    code_128: 'CODE_128',
-    ean_13: 'EAN_13',
-    ean_8: 'EAN_8',
-    upc_a: 'UPC_A',
-    upc_e: 'UPC_E',
-    code_39: 'CODE_39',
-    code_93: 'CODE_93',
-    itf: 'ITF',
-    codabar: 'CODABAR',
-    qr_code: 'QR_CODE',
-    data_matrix: 'DATA_MATRIX',
-    pdf417: 'PDF_417',
-  };
-
-  let barcodeDetectorFormatsCache = null;
-  let barcodeDetectorFormatsPromise = null;
-  let barcodeDetectorAvailable = null;
-  let barcodeDetectorSupportsVideo = null;
-  let barcodeDetectorSupportsBitmap = null;
-  let detectionCanvas = null;
-  let detectionCanvasCtx = null;
-
-  // ---- Utilidades UI ----
-  const $ = sel => document.querySelector(sel);
-  const el = (tag, attrs={},{children=[]}={}) => { const n = document.createElement(tag); Object.entries(attrs).forEach(([k,v])=>{ if(k==="class") n.className=v; else if(k==="text") n.textContent=v; else n.setAttribute(k,v)}); children.forEach(c=> n.appendChild(c)); return n};
-  const sleep = ms => new Promise(r=>setTimeout(r,ms));
-
-  // Evita el warning de ZXing "Trying to play video that is already playing"
-  // devolviendo un resolved Promise cuando el video ya está en reproducción.
-  if(typeof HTMLMediaElement !== 'undefined' && !HTMLMediaElement.prototype.play.__scanGuarded){
-    const originalPlay = HTMLMediaElement.prototype.play;
-    const guardedPlay = function(...args){
-      if(this && typeof this.paused === 'boolean' && !this.paused){
-        return typeof Promise !== 'undefined' ? Promise.resolve() : undefined;
-      }
-      return originalPlay.apply(this, args);
-    };
-    guardedPlay.__scanGuarded = true;
-    HTMLMediaElement.prototype.play = guardedPlay;
-  }
-
-  let scanLabelTimer = null;
-  let manualScanBusy = false;
-
-  function setChip(id, text, ok=null){
-    const chip = $(id); chip.textContent = text;
-    chip.classList.remove('ok','bad');
-    if(ok===true) chip.classList.add('ok');
-    if(ok===false) chip.classList.add('bad');
-  }
-
-  function setScanLabel(text, revertMs=null){
-    const label = $('#scanLabel');
-    if(!label) return;
-    label.textContent = text;
-    if(scanLabelTimer){ clearTimeout(scanLabelTimer); scanLabelTimer = null; }
-    if(revertMs!==null){
-      scanLabelTimer = setTimeout(()=>{
-        scanLabelTimer = null;
-        if(state.scanning){ label.textContent = 'Escaneando…'; }
-      }, revertMs);
-    }
-  }
-
-  function confetti(x=window.innerWidth/2,y=window.innerHeight/2){
-    const c = el('canvas',{style:`position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:9999`});
-    document.body.appendChild(c);
-    const ctx = c.getContext('2d'); c.width=innerWidth; c.height=innerHeight;
-    const parts = Array.from({length:120},()=>({x,y,vx:(Math.random()-0.5)*6,vy:(Math.random()*-6-3),w:2+Math.random()*3,h:6+Math.random()*6,rot:Math.random()*Math.PI,vr:(Math.random()-0.5)*.2,life:120+Math.random()*60, col:`hsl(${Math.random()*360},90%,70%)`}));
-    let tick=0; (function loop(){ ctx.clearRect(0,0,c.width,c.height); parts.forEach(p=>{ p.vy+=.12; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr; p.life--; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.col; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); });
-      if(++tick<180){ requestAnimationFrame(loop)} else c.remove(); })();
-  }
-
-  function updateInventoryIndicators(){
-    const inv = $('#invCount');
-    if(inv){
-      const total = state.inventory.length;
-      inv.textContent = `${total} ${total===1 ? 'ítem' : 'ítems'}`;
-      inv.title = state.inventoryName ? `Inventario: ${state.inventoryName}` : '';
-    }
-    const keyInfo = $('#keyIndicator');
-    if(keyInfo){
-      keyInfo.textContent = state.key ? `Clave: ${state.key}` : 'Clave: —';
-    }
-    const toggleBtn = $('#inventoryToggle');
-    if(toggleBtn){
-      toggleBtn.title = state.inventoryName ? `Inventario: ${state.inventoryName}` : 'Abrir panel de inventario';
-      toggleBtn.disabled = false;
-    }
-  }
-
-  function toggleInventoryDrawer(open){
-    const drawer = $('#inventoryDrawer');
-    if(!drawer) return;
-    const toggler = $('#inventoryToggle');
-    const closeBtn = $('#inventoryClose');
-    const shouldOpen = typeof open === 'boolean' ? open : drawer.classList.contains('hidden');
-    if(shouldOpen){
-      drawer.classList.remove('hidden');
-      drawer.setAttribute('aria-hidden','false');
-      toggler?.setAttribute('aria-expanded','true');
-      requestAnimationFrame(()=> closeBtn?.focus());
-    }else{
-      drawer.classList.add('hidden');
-      drawer.setAttribute('aria-hidden','true');
-      toggler?.setAttribute('aria-expanded','false');
-      toggler?.focus();
-    }
-  }
-
-  // ---- CSV Parser (ligero, con autodetección de separador) ----
-  function stripBom(text){ return text.replace(/^\uFEFF/, ''); }
-
-  function detectDelimiter(text){
-    const sample = stripBom(text).split(/\r?\n/).find(line=> line.trim().length) || '';
-    const candidates = [',',';','\t','|'];
-    let best = ',', bestCount = 0;
-    for(const delimiter of candidates){
-      let count = 0; let inQ = false;
-      for(let i=0;i<sample.length;i++){
-        const ch = sample[i];
-        if(ch==='"'){
-          if(inQ && sample[i+1]==='"'){ i++; }
-          inQ = !inQ;
-        } else if(ch===delimiter && !inQ){ count++; }
-      }
-      if(count>bestCount){ best = delimiter; bestCount = count; }
-    }
-    return bestCount>0 ? best : ',';
-  }
-
-  function parseCSV(text, delimiter=','){
-    const clean = stripBom(text);
-    const rows = [];
-    let cur = '', row = [], inQ=false;
-    for(let i=0;i<clean.length;i++){
-      const ch = clean[i], next = clean[i+1];
-      if(ch==='"'){
-        if(inQ && next==='"'){ cur+='"'; i++; }
-        else { inQ = !inQ; }
-      } else if(ch===delimiter && !inQ){
-        row.push(cur); cur='';
-      } else if((ch==='\n' || ch==='\r') && !inQ){
-        if(ch==='\r' && next==='\n'){ i++; }
-        if(cur!=='' || row.length){ row.push(cur); rows.push(row); row=[]; cur=''; }
-      } else {
-        cur+=ch;
-      }
-    }
-    if(cur!=='' || row.length){ row.push(cur); rows.push(row); }
-    return rows;
-  }
-
-  function parseCSVAuto(text){
-    const delimiter = detectDelimiter(text);
-    const rows = parseCSV(text, delimiter).filter(r=> r.length && r.some(c=> String(c ?? '').trim()!==''));
-    return { rows, delimiter };
-  }
-
-  // ---- Lectura de archivos ----
-  async function loadFile(file){
-    if(!file) return;
-    try{
-      const name = file.name;
-      const lower = name.toLowerCase();
-      if(lower.endsWith('.csv')){
-        const text = await file.text();
-        const {rows, delimiter} = parseCSVAuto(text);
-        hydrateInventory(rows, { name, delimiter });
-      } else if(lower.endsWith('.xlsx') || lower.endsWith('.xls')){
-        await ensureSheetJS();
-        if(!window.XLSX){
-          alert('No se pudo cargar el lector de Excel. Exportá a CSV y volvé a intentar.');
-          setInventoryStatus('No se pudo cargar el lector de Excel. Preferí CSV para uso offline.', 'warn');
-          return;
-        }
-        const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, {type:'array'});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-        hydrateInventory(rows, { name });
-      } else {
-        alert('Formato no soportado. Usá CSV o Excel (.xlsx).');
-        setInventoryStatus('Formato no soportado. Seleccioná un CSV o Excel.', 'error');
-      }
-    }catch(err){
-      console.error('Error al leer archivo', err);
-      alert('Ocurrió un problema al leer el archivo seleccionado. Verificá el formato e intentá nuevamente.');
-      setInventoryStatus('No se pudo cargar el archivo seleccionado.', 'error');
-    }
-  }
-
-  function uniqueColumnNames(rawHeader){
-    const seen = new Set();
-    return rawHeader.map((name, idx)=>{
-      let base = String(name ?? '').replace(/\uFEFF/g,'').trim();
-      if(!base){ base = `col_${idx+1}`; }
-      let final = base;
-      let counter = 2;
-      while(seen.has(final)){
-        final = `${base}_${counter++}`;
-      }
-      seen.add(final);
-      return final;
-    });
-  }
-
-  function normalizeRowValue(value){
-    if(value===null || value===undefined) return '';
-    if(typeof value === 'string') return value.replace(/\uFEFF/g,'').trim();
-    return String(value);
-  }
-
-  function setInventoryStatus(text='', tone='info'){
-    const targets = ['#autoLoadMsg', '#inventoryStatus'];
-    const classes = ['success','error','warn'];
-    targets.forEach(sel=>{
-      const msg = $(sel);
-      if(!msg) return;
-      msg.textContent = text;
-      msg.classList.remove(...classes);
-      if(tone==='success') msg.classList.add('success');
-      else if(tone==='error') msg.classList.add('error');
-      else if(tone==='warn') msg.classList.add('warn');
-    });
-  }
-
-  function hydrateInventory(rows, {name='inventario', delimiter}={}){
-    if(!rows.length){
-      alert('El archivo está vacío.');
-      setInventoryStatus('El archivo no contiene registros.', 'error');
-      return;
-    }
-    const [header, ...data] = rows;
-    state.columns = uniqueColumnNames(header);
-    state.inventory = data
-      .filter(r=> Array.isArray(r) && r.some(c=> String(c ?? '').trim()!==''))
-      .map(r=> Object.fromEntries(state.columns.map((c,i)=>[c, normalizeRowValue(r[i])] )));
-    if(!state.columns.length){
-      setInventoryStatus('No se detectaron columnas en el archivo.', 'error');
-      return;
-    }
-    state.inventoryName = name;
-    if(delimiter){ state.exportDelimiter = delimiter; }
-    $('#filterInput').value = '';
-    // Detectar columna probable de código
-    const lc = state.columns.map(c=>c.toLowerCase());
-    const guess = ['codigo','código','barcode','barra','ean','sku','id','inventario','cod_barra','code','nro.inventario']
-      .find(k=> lc.includes(k));
-    state.key = guess || state.columns[0];
-    rebuildIndex();
-    paintInventory();
-    fillKeySelect();
-    paintConformados();
-    updateInventoryIndicators();
-    setInventoryStatus(`Inventario cargado${name?` (${name})`:''}: ${state.inventory.length} ítems disponibles.`, 'success');
-  }
-
-  function rebuildIndex(){
-    state.index = new Map();
-    if(!state.columns.includes(state.key)){
-      state.key = state.columns[0] || null;
-    }
-    if(!state.key) return;
-    for(const row of state.inventory){
-      const code = String(row[state.key] ?? '').trim();
-      if(code) state.index.set(code, row);
-    }
-    updateInventoryIndicators();
-  }
-
-  function fillKeySelect(){
-    const sel = $('#keySelect'); sel.innerHTML = '';
-    state.columns.forEach(c=> sel.appendChild(el('option',{value:c, text:c})));
-    sel.disabled = state.columns.length===0;
-    sel.value = state.key || '';
-  }
-
-  function paintInventory(){
-    const tbl = $('#invTbl'); tbl.innerHTML = '';
-    if(!state.columns.length){
-      const tr = el('tr');
-      const td = el('td',{text:'Cargá un inventario para ver la vista previa.'});
-      td.colSpan = 1;
-      tr.appendChild(td);
-      tbl.appendChild(tr);
-      $('#visibleCount').textContent = '0 visibles';
-      return;
-    }
-    const head = el('tr');
-    const cols = state.columns.slice(0, 6);
-    cols.forEach(c=> head.appendChild(el('th',{text:c})));
-    tbl.appendChild(head);
-    const filter = $('#filterInput').value.toLowerCase();
-    let visible = 0;
-    for(const row of state.inventory){
-      const line = cols.map(c=> String(row[c]??'')).join(' ').toLowerCase();
-      if(filter && !line.includes(filter)) continue;
-      visible++;
-      const tr = el('tr');
-      cols.forEach(c=> tr.appendChild(el('td',{text:String(row[c]??'')})));
-      tbl.appendChild(tr);
-    }
-    $('#visibleCount').textContent = `${visible} visibles`;
-  }
-
-  // ---- Cámara y BarcodeDetector ----
-  async function initDevices(){
-    try{
-      const devs = await navigator.mediaDevices.enumerateDevices();
-      state.cameraDevices = devs.filter(d=> d.kind==='videoinput');
-      $('#switchBtn').disabled = state.cameraDevices.length<2;
-    }catch(e){ console.warn(e); }
-  }
-
-  async function startCamera(){
-    try{
-      const videoConstraints = { width:{ideal:1280}, height:{ideal:720}, facingMode:'environment' };
-      if(state.currentDeviceId){
-        delete videoConstraints.facingMode;
-        videoConstraints.deviceId = { exact: state.currentDeviceId };
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
-      const v = $('#video'); v.srcObject = stream; await v.play();
-      const track = stream.getVideoTracks?.()[0];
-      state.currentDeviceId = track?.getSettings?.().deviceId || state.currentDeviceId;
-      $('#pulse').classList.add('on');
-      setScanLabel('Escaneando…');
-      $('#startBtn').disabled = true; $('#stopBtn').disabled = false;
-      $('#flashBtn').textContent = 'Flash';
-      state.torchOn = false;
-      let torchAvailable = !!track;
-      const caps = track?.getCapabilities?.();
-      if(track && caps && ('torch' in caps)){
-        torchAvailable = !!caps.torch;
-      }
-      $('#flashBtn').disabled = !torchAvailable;
-      state.scanning = true;
-      manualScanBusy = false;
-      const scanBtn = $('#scanOnceBtn');
-      if(scanBtn){
-        scanBtn.disabled = false;
-        scanBtn.textContent = 'Ejecutar lectura';
-      }
-      if(state.fallbackReader?.reset) state.fallbackReader.reset();
-      state.detector = null;
-      state.fallbackErrorShown = false;
-      detectionCanvas = null;
-      detectionCanvasCtx = null;
-      _lastDetectTs = 0;
-      const engine = await ensureDetectionEngine();
-      if(!engine){
-        handleNoDetectionAvailable();
-        stopCamera();
-        return;
-      }
-      await initDevices();
-      detectLoop();
-    }catch(e){ alert('No se pudo acceder a la cámara. Revisá permisos.'); console.error(e); }
-  }
-
-  function stopCamera(){
-    const v = $('#video');
-    const s = v.srcObject;
-    if(s){ s.getTracks().forEach(t=>t.stop()); v.srcObject=null; }
-    state.scanning = false;
-    manualScanBusy = false;
-    $('#pulse').classList.remove('on');
-    setScanLabel('Cámara inactiva');
-    $('#startBtn').disabled = false; $('#stopBtn').disabled = true;
-    $('#flashBtn').disabled = true; $('#flashBtn').textContent = 'Flash';
-    state.torchOn = false;
-    const scanBtn = $('#scanOnceBtn');
-    if(scanBtn){
-      scanBtn.disabled = true;
-      scanBtn.textContent = 'Ejecutar lectura';
-    }
-    state.detector = null;
-    if(state.fallbackReader?.reset) state.fallbackReader.reset();
-    state.fallbackReader = null;
-    detectionCanvas = null;
-    detectionCanvasCtx = null;
-  }
-
-  async function toggleTorch(){
-    const track = $('#video').srcObject?.getVideoTracks?.()[0];
-    if(!track) return;
-    const caps = track.getCapabilities?.()||{}; if(!caps.torch){ return alert('El flash no está disponible en este dispositivo.'); }
-    state.torchOn = !state.torchOn;
-    await track.applyConstraints({ advanced: [{ torch: state.torchOn }] });
-    $('#flashBtn').textContent = state.torchOn? 'Flash (ON)' : 'Flash';
-  }
-
-  async function switchCamera(){
-    if(state.cameraDevices.length<2) return;
-    const idx = state.cameraDevices.findIndex(d=> d.deviceId===state.currentDeviceId);
-    const next = state.cameraDevices[(idx+1) % state.cameraDevices.length];
-    state.currentDeviceId = next.deviceId; stopCamera(); startCamera();
-  }
-
-  function isVideoReady(video){
-    return !!(video && video.readyState >= 2 && video.videoWidth && video.videoHeight);
-  }
-
-  async function getSupportedBarcodeFormats(){
-    if(!('BarcodeDetector' in window)) return [];
-    if(barcodeDetectorFormatsCache) return barcodeDetectorFormatsCache;
-    if(!barcodeDetectorFormatsPromise){
-      barcodeDetectorFormatsPromise = (async ()=>{
-        if(typeof BarcodeDetector.getSupportedFormats === 'function'){
-          try{
-            const supported = await BarcodeDetector.getSupportedFormats();
-            if(Array.isArray(supported) && supported.length){
-              const filtered = BARCODE_FORMATS.filter(f=> supported.includes(f));
-              return filtered.length ? filtered : supported;
-            }
-          }catch(err){
-            console.warn('No se pudieron obtener los formatos soportados por BarcodeDetector', err);
-          }
-        }
-        return BARCODE_FORMATS.slice();
-      })()
-      .then(list=>{
-        barcodeDetectorFormatsCache = Array.isArray(list) ? list : BARCODE_FORMATS.slice();
-        return barcodeDetectorFormatsCache;
-      })
-      .catch(err=>{
-        console.warn('Fallo resolviendo formatos para BarcodeDetector', err);
-        barcodeDetectorFormatsCache = [];
-        return barcodeDetectorFormatsCache;
-      });
-    }
-    await barcodeDetectorFormatsPromise;
-    return barcodeDetectorFormatsCache;
-  }
-
-  async function ensureBarcodeDetector(){
-    if(barcodeDetectorAvailable === false) return null;
-    if(!('BarcodeDetector' in window)){
-      barcodeDetectorAvailable = false;
-      return null;
-    }
-    if(state.detector) return state.detector;
-    try{
-      const formats = await getSupportedBarcodeFormats();
-      state.detector = formats && formats.length
-        ? new BarcodeDetector({ formats })
-        : new BarcodeDetector();
-      barcodeDetectorAvailable = true;
-      setChip('#apiStatus','API: BarcodeDetector', true);
-      state.fallbackErrorShown = false;
-      return state.detector;
-    }catch(err){
-      barcodeDetectorAvailable = false;
-      state.detector = null;
-      console.warn('BarcodeDetector no disponible, usando ZXing', err);
-      return null;
-    }
-  }
-
-  function captureCanvasFrame(video){
-    if(!isVideoReady(video)) return null;
-    if(!detectionCanvas){
-      detectionCanvas = document.createElement('canvas');
-      detectionCanvasCtx = detectionCanvas.getContext('2d', { willReadFrequently: true });
-    }
-    if(!detectionCanvasCtx) return null;
-    if(detectionCanvas.width !== video.videoWidth || detectionCanvas.height !== video.videoHeight){
-      detectionCanvas.width = video.videoWidth;
-      detectionCanvas.height = video.videoHeight;
-    }
-    detectionCanvasCtx.drawImage(video, 0, 0, detectionCanvas.width, detectionCanvas.height);
-    return detectionCanvas;
-  }
-
-  function configureZXingReader(reader, ZX){
-    if(!reader || !ZX || !ZX.DecodeHintType || !ZX.BarcodeFormat || typeof reader.setHints !== 'function') return;
-    try{
-      const hints = new Map();
-      const formats = [];
-      for(const key of BARCODE_FORMATS){
-        const mapped = ZXING_FORMAT_MAP[key];
-        if(mapped && ZX.BarcodeFormat[mapped]){
-          formats.push(ZX.BarcodeFormat[mapped]);
-        }
-      }
-      if(formats.length){
-        hints.set(ZX.DecodeHintType.POSSIBLE_FORMATS, formats);
-      }
-      if(ZX.DecodeHintType.TRY_HARDER){
-        hints.set(ZX.DecodeHintType.TRY_HARDER, true);
-      }
-      reader.setHints(hints);
-    }catch(err){
-      console.warn('No se pudieron configurar los hints para ZXing', err);
-    }
-  }
-
-  async function ensureFallbackReader(){
-    if(state.fallbackReader) return state.fallbackReader;
-    const ZX = await ensureZXing();
-    if(!ZX || !ZX.BrowserMultiFormatReader) return null;
-    const reader = new ZX.BrowserMultiFormatReader();
-    if('timeBetweenDecodingAttempts' in reader){
-      reader.timeBetweenDecodingAttempts = DETECT_EVERY_MS;
-    }
-    if('timeBetweenScansMillis' in reader){
-      reader.timeBetweenScansMillis = DETECT_EVERY_MS;
-    }
-    configureZXingReader(reader, ZX);
-    state.fallbackReader = reader;
-    setChip('#apiStatus','API: ZXing (fallback)', true);
-    state.fallbackErrorShown = false;
-    return state.fallbackReader;
-  }
-
-  function handleNoDetectionAvailable(){
-    setChip('#apiStatus','API: no disponible (sin ZXing)', false);
-    if(!state.fallbackErrorShown){
-      alert('Este navegador no soporta BarcodeDetector y no se pudo cargar la librería ZXing. Usá el ingreso manual.');
-      state.fallbackErrorShown = true;
-    }
-  }
-
-  async function ensureDetectionEngine(){
-    const detector = await ensureBarcodeDetector();
-    if(detector) return 'detector';
-    const fallback = await ensureFallbackReader();
-    if(fallback) return 'fallback';
-    return null;
-  }
-
-  async function detectWithNative(detector, video){
-    if(!detector || !isVideoReady(video)) return null;
-    const attempts = [];
-    if(barcodeDetectorSupportsVideo !== false){
-      attempts.push(async ()=>({ kind:'video', source: video }));
-    }
-    if(typeof window.createImageBitmap === 'function' && barcodeDetectorSupportsBitmap !== false){
-      attempts.push(async ()=>{
-        const bitmap = await window.createImageBitmap(video);
-        return { kind:'bitmap', source: bitmap, cleanup: ()=> bitmap.close() };
-      });
-    }
-    attempts.push(async ()=>{
-      const canvas = captureCanvasFrame(video);
-      return canvas ? { kind:'canvas', source: canvas } : null;
-    });
-
-    for(const attempt of attempts){
-      let payload = null;
-      try{
-        payload = await attempt();
-        if(!payload || !payload.source) continue;
-        const codes = await detector.detect(payload.source);
-        if(codes && codes.length){
-          const first = codes[0];
-          const value = first?.rawValue || first?.displayValue || '';
-          if(value){
-            payload.cleanup?.();
-            return value;
-          }
-        }
-      }catch(err){
-        if(payload?.kind === 'video'){
-          barcodeDetectorSupportsVideo = false;
-          if(err?.name !== 'TypeError'){
-            console.warn('Error detectando con BarcodeDetector (video)', err);
-          }
-        } else if(payload?.kind === 'bitmap'){
-          barcodeDetectorSupportsBitmap = false;
-          console.warn('Error generando ImageBitmap para BarcodeDetector', err);
-        } else {
-          console.warn('Error detectando con BarcodeDetector', err);
-        }
-      }finally{
-        try{ payload?.cleanup?.(); }catch{}
-      }
-    }
-    return null;
-  }
-
-  function isZXingExpectedError(err, ZX){
-    if(!err) return true;
-    if(err?.message === 'ZXING_TIMEOUT') return true;
-    const name = err?.name;
-    if(ZX && (err instanceof ZX.NotFoundException || err instanceof ZX.ChecksumException || err instanceof ZX.FormatException)){
-      return true;
-    }
-    if(name && ['NotFoundException','ChecksumException','FormatException'].includes(name)){
-      return true;
-    }
-    if(err?.message?.includes('No MultiFormat Readers were able to detect')){
-      return true;
-    }
-    return false;
-  }
-
-  async function detectWithZXing(reader, video, {manual=false}={}){
-    if(!reader || !isVideoReady(video)) return null;
-    const ZX = window.ZXing;
-    try{
-      if(manual){
-        const result = await Promise.race([
-          reader.decodeFromVideoElement(video),
-          new Promise((_, reject)=> setTimeout(()=> reject(new Error('ZXING_TIMEOUT')), ZXING_MANUAL_TIMEOUT_MS)),
-        ]);
-        const text = result?.text || result?.getText?.();
-        return text || null;
-      }
-      const result = await reader.decodeFromVideoElement(video);
-      const text = result?.text || result?.getText?.();
-      return text || null;
-    }catch(err){
-      if(!isZXingExpectedError(err, ZX)){
-        console.warn(`Error detectando con ZXing${manual ? ' (manual)' : ''}`, err);
-      }
-      return null;
-    }finally{
-      if(manual){
-        try{ reader.reset?.(); }catch{}
-      }
-    }
-  }
-
-  async function runDetection(video, {manual=false}={}){
-    let detector = await ensureBarcodeDetector();
-    if(detector){
-      const native = await detectWithNative(detector, video);
-      if(native){
-        return { text: native, engine: 'detector' };
-      }
-    }
-    const fallback = await ensureFallbackReader();
-    if(fallback){
-      const zx = await detectWithZXing(fallback, video, {manual});
-      if(zx){
-        return { text: zx, engine: 'fallback' };
-      }
-    }
-    if(!detector && !fallback){
-      handleNoDetectionAvailable();
-    }
-    return null;
-  }
-
-  // Throttle de detección para mejorar rendimiento en móvil
-  let _lastDetectTs = 0;
-  const DETECT_EVERY_MS = 250;
-  const ZXING_MANUAL_TIMEOUT_MS = 1500;
-
-  async function detectLoop(){
-    if(!state.scanning) return;
-    try{
-      const video = $('#video');
-      const now = performance.now();
-      if(!isVideoReady(video)){
-        requestAnimationFrame(detectLoop);
-        return;
-      }
-      if((now - _lastDetectTs) < DETECT_EVERY_MS){
-        requestAnimationFrame(detectLoop);
-        return;
-      }
-      const result = await runDetection(video);
-      _lastDetectTs = performance.now();
-      if(result?.text && state.scanning){
-        onDetect(result.text);
-      }
-    }catch(err){
-      console.warn('detectLoop error', err);
-    }
-    requestAnimationFrame(detectLoop);
-  }
-
-  async function scanOnce(){
-    if(manualScanBusy) return;
-    if(!state.scanning){
-      alert('Iniciá la cámara para ejecutar una lectura.');
-      return;
-    }
-    const video = $('#video');
-    const btn = $('#scanOnceBtn');
-    if(!video?.srcObject){
-      alert('No hay una cámara activa. Iniciá la cámara.');
-      return;
-    }
-    manualScanBusy = true;
-    const prevText = btn?.textContent || '';
-    if(btn){
-      btn.disabled = true;
-      btn.textContent = 'Leyendo…';
-    }
-    setScanLabel('Buscando código…');
-    let detected = false;
-    try{
-      if(!isVideoReady(video)){
-        await sleep(120);
-      }
-      if(isVideoReady(video)){
-        const result = await runDetection(video, {manual:true});
-        if(result?.text){
-          detected = true;
-          onDetect(result.text);
-        }
-      }
-      setScanLabel(detected ? 'Código detectado' : 'Sin resultados', 1800);
-    }catch(err){
-      console.warn('scanOnce error', err);
-      setScanLabel('Error en lectura', 2000);
-    }finally{
-      if(state.scanning){
-        _lastDetectTs = performance.now();
-      }
-      if(btn){
-        btn.textContent = prevText || 'Ejecutar lectura';
-        if(state.scanning){
-          btn.disabled = false;
-        }
-      }
-      manualScanBusy = false;
-    }
-  }
-
-  function onDetect(code){
-    code = String(code||'').trim(); if(!code) return;
-    // Anti-rebote: evita repetir el mismo código por 3s
-    const now = Date.now();
-    if(state.lastScan.code===code && (now - state.lastScan.time) < 3000) return;
-    state.lastScan = { code, time: now };
-
-    $('#detectedCode').value = code; $('#copyBtn').disabled = false; $('#confirmBtn').disabled = false; $('#confirmBtnMobile').disabled = false;
-    const row = state.index.get(code);
-    if(row){
-      setChip('#matchChip','Coincide en inventario', true);
-      paintDetails(row);
-      flashOK();
-    } else {
-      setChip('#matchChip','No encontrado en inventario', false);
-      clearDetails();
-      flashWarn();
-    }
-  }
-
-  function paintDetails(row){
-    $('#noData').classList.add('hidden'); $('#detailTable').classList.remove('hidden');
-    const tbl = $('#detailTbl'); tbl.innerHTML='';
-    for(const c of state.columns){
-      const tr = el('tr'); tr.appendChild(el('th',{text:c})); tr.appendChild(el('td',{text:String(row[c]??'')})); tbl.appendChild(tr);
-    }
-  }
-  function clearDetails(){ $('#detailTbl').innerHTML=''; $('#detailTable').classList.add('hidden'); $('#noData').classList.remove('hidden'); }
-
-  function flashOK(){
-    const card = document.querySelector('.details'); card.style.boxShadow='0 0 0 2px rgba(56,217,150,.5)'; setTimeout(()=> card.style.boxShadow='', 320);
-  }
-  function flashWarn(){
-    const card = document.querySelector('.details'); card.style.boxShadow='0 0 0 2px rgba(255,191,105,.6)'; setTimeout(()=> card.style.boxShadow='', 320);
-  }
-
-  function addConformado(code){
-    const ts = new Date().toISOString();
-    const row = state.index.get(String(code)) || null;
-    // Evitar duplicados exactos por código
-    if(state.conformados.some(x=> x.codigo===code)) return;
-    const rec = { codigo: code, timestamp: ts };
-    if(row){ for(const c of state.columns){ rec[c] = row[c]??''; } rec._match = '1'; }
-    else { rec._match = '0'; }
-    state.conformados.unshift(rec);
-    persistConformados();
-    paintConformados();
-    confetti(window.innerWidth-180, 140);
-  }
-
-  function paintConformados(){
-    const tbl = $('#confTbl'); tbl.innerHTML='';
-    const cols = ['timestamp','codigo','_match', ...state.columns.slice(0,4)];
-    const head = el('tr'); cols.forEach(c=> head.appendChild(el('th',{text:c}))); tbl.appendChild(head);
-    for(const rec of state.conformados){
-      const tr = el('tr'); tr.classList.add('added');
-      cols.forEach(c=> tr.appendChild(el('td',{text:String(rec[c]??'')})));
-      tbl.appendChild(tr);
-    }
-    $('#confCount').textContent = state.conformados.length;
-  }
-
-  function exportCSV(){
-    if(!state.conformados.length){ alert('No hay registros para exportar.'); return; }
-    const cols = Array.from(new Set(['timestamp','codigo','_match', ...state.columns]));
-    const esc=v=> '"'+String(v??'').replace(/"/g,'""')+'"';
-    const delim = state.exportDelimiter || ',';
-    const lines = [cols.map(esc).join(delim)];
-    state.conformados.forEach(rec=>{ lines.push(cols.map(c=> esc(rec[c])).join(delim)); });
-    const blob = new Blob(['\uFEFF'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = el('a',{href:url, download:'conformado.csv'}); document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  }
-
-  function persistConformados(){
-    try{ localStorage.setItem('conformados_v1', JSON.stringify(state.conformados)); }catch{}
-  }
-  function restoreConformados(){
-    try{ const v = JSON.parse(localStorage.getItem('conformados_v1')||'[]'); if(Array.isArray(v)) state.conformados = v; }catch{}
-    paintConformados();
-  }
-
-  async function ensureSheetJS(){
-    if(window.XLSX) return;
-    await new Promise((resolve)=>{
-      const s = document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload=resolve; s.onerror=resolve; document.head.appendChild(s);
-    });
-  }
-
-  let ensureZXingPromise = null;
-  async function ensureZXing(){
-    if(window.ZXing && window.ZXing.BrowserMultiFormatReader) return window.ZXing;
-    if(ensureZXingPromise) return ensureZXingPromise;
-    ensureZXingPromise = new Promise((resolve)=>{
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js';
-      s.onload = ()=> resolve(window.ZXing || null);
-      s.onerror = ()=> resolve(null);
-      document.head.appendChild(s);
-    });
-    const lib = await ensureZXingPromise;
-    if(!lib || !lib.BrowserMultiFormatReader){
-      ensureZXingPromise = null;
-      return null;
-    }
-    return lib;
-  }
-
-  // ---- Eventos ----
-  async function loadDefaultInventory(){
-    try{
-      const res = await fetch('inventario.csv', {cache:'no-store'});
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      if(!text.trim()) throw new Error('Archivo vacío');
-      const {rows, delimiter} = parseCSVAuto(text);
-      hydrateInventory(rows, { name: 'inventario.csv', delimiter });
-    }catch(err){
-      console.info('Inventario automático no disponible:', err);
-      const manualMsg = location.protocol === 'file:'
-        ? 'Abrí este archivo desde un servidor o seleccioná el inventario manualmente.'
-        : 'Seleccioná un archivo usando el botón "Seleccionar" o arrastralo al recuadro.';
-      setInventoryStatus(manualMsg, 'warn');
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded', async ()=>{
-    restoreConformados();
-    await initDevices();
-    updateInventoryIndicators();
-    setInventoryStatus('Buscando inventario predeterminado…', 'info');
-    loadDefaultInventory();
-    const drawer = $('#inventoryDrawer');
-    $('#inventoryToggle').addEventListener('click', ()=> toggleInventoryDrawer());
-    $('#inventoryClose').addEventListener('click', ()=> toggleInventoryDrawer(false));
-    if(drawer){
-      drawer.addEventListener('click', (e)=>{ if(e.target===drawer) toggleInventoryDrawer(false); });
-    }
-    document.addEventListener('keydown', (e)=>{
-      if(e.key==='Escape' && !drawer?.classList.contains('hidden')){
-        toggleInventoryDrawer(false);
-      }
-    });
-    $('#keySelect').addEventListener('change', e=>{ state.key = e.target.value; rebuildIndex(); });
-    $('#filterInput').addEventListener('input', paintInventory);
-
-    // Drag & drop
-    const drop = $('#drop');
-    const handleLoad = e=>{ e.preventDefault(); drop.classList.remove('drag'); const f = (e.dataTransfer||{}).files?.[0]; if(f) loadFile(f); };
-    drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag'); });
-    drop.addEventListener('dragleave', ()=> drop.classList.remove('drag'));
-    drop.addEventListener('drop', handleLoad);
-
-    // También click / Enter sobre el área de drop
-    drop.addEventListener('click', ()=> $('#fileInput').click());
-    drop.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); $('#fileInput').click(); } });
-
-    // File input
-    $('#fileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) loadFile(f); e.target.value=''; });
-
-    // Scanner
-    $('#startBtn').addEventListener('click', startCamera);
-    $('#stopBtn').addEventListener('click', stopCamera);
-    $('#flashBtn').addEventListener('click', toggleTorch);
-    $('#switchBtn').addEventListener('click', switchCamera);
-    $('#scanOnceBtn').addEventListener('click', scanOnce);
-
-    // Manual input
-    const manual = ()=>{ const v = $('#manualInput').value.trim(); if(!v) return; onDetect(v); $('#manualInput').value=''; };
-    $('#manualBtn').addEventListener('click', manual);
-    $('#manualInput').addEventListener('keydown', e=>{ if(e.key==='Enter') manual(); });
-
-    // Actions
-    const confirmAction = ()=>{ const code = $('#detectedCode').value; if(!code) return; addConformado(code); };
-    $('#confirmBtn').addEventListener('click', confirmAction);
-    $('#confirmBtnMobile').addEventListener('click', confirmAction);
-    $('#copyBtn').addEventListener('click', ()=>{ const code=$('#detectedCode').value; if(code) navigator.clipboard.writeText(code); });
-    $('#exportBtn').addEventListener('click', exportCSV);
-    $('#exportBtnMobile').addEventListener('click', exportCSV);
-    $('#clearBtn').addEventListener('click', ()=>{ if(confirm('¿Vaciar la lista de conformados?')){ state.conformados=[]; persistConformados(); paintConformados(); }});
-
-    // Atajo global para confirmar rápido
-    document.addEventListener('keydown', e=>{ if(e.key==='c' && (e.ctrlKey||e.metaKey)) $('#confirmBtn').click(); });
-
-    // ===== Pruebas =====
-    $('#btnTestCSV').addEventListener('click', ()=>{
-      const sample = 'codigo,desc,qty\r\n123,Item A,5\r\n"124,7",Item B,10\r\n125,"Item, C",0\r\n';
-      const parsedA = parseCSVAuto(sample);
-      console.assert(parsedA.rows.length===4, 'CSV coma: 4 filas contando header');
-      console.assert(parsedA.rows[2][0]==='124,7', 'CSV coma: campo con coma entre comillas');
-
-      const sampleB = '\uFEFFcodigo;desc;qty\n001;Item A;5\n002;"Item; B";3\n';
-      const parsedB = parseCSVAuto(sampleB);
-      console.assert(parsedB.delimiter===';', 'CSV punto y coma detectado');
-      console.assert(parsedB.rows[2][1]==='Item; B', 'CSV punto y coma respeta comillas internas');
-
-      console.log('✅ Test CSV OK', {coma: parsedA, puntoYComa: parsedB});
-    });
-
-    $('#btnTestExport').addEventListener('click', ()=>{
-      state.columns = ['codigo','desc'];
-      state.exportDelimiter = ';';
-      state.conformados = [
-        {timestamp:'2025-10-22T12:00:00Z', codigo:'ABC', _match:'1', desc:'Algo'},
-        {timestamp:'2025-10-22T12:01:00Z', codigo:'XYZ', _match:'0', desc:'Otra'}
-      ];
-      exportCSV();
-      console.log('✅ Test export OK (deberías ver un archivo descargado)');
-    });
-  });
-
-  if(typeof window !== 'undefined'){
-    window.__SCAN__ = {
-      state,
-      parseCSV,
-      parseCSVAuto,
-      detectDelimiter,
-      uniqueColumnNames,
-      normalizeRowValue,
-      hydrateInventory,
-      rebuildIndex,
-      setInventoryStatus,
-      loadFile,
-      loadDefaultInventory,
-      paintInventory,
-      paintConformados,
-      paintDetails,
-      clearDetails,
-      addConformado,
-      exportCSV,
-      startCamera,
-      stopCamera,
-      toggleTorch,
-      switchCamera,
-      scanOnce,
-      detectLoop,
-      onDetect,
-      confetti,
-      setChip,
-      setScanLabel,
-      updateInventoryIndicators,
-      toggleInventoryDrawer,
-      ensureZXing,
-      ensureSheetJS,
-      persistConformados,
-      restoreConformados,
-      stateSnapshot: () => JSON.parse(JSON.stringify(state)),
-    };
-  }
-  </script>
+  <script src="./app.js"></script>
 </body>
 </html>

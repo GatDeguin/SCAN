@@ -84,6 +84,8 @@ async function createApp({ inventory = inventoryCsv } = {}) {
   });
 
   const { window } = dom;
+  const appScript = fs.readFileSync(path.join(process.cwd(), 'app.js'), 'utf8');
+  window.eval(appScript);
   window.URL.createObjectURL = vi.fn(() => 'blob:mock');
   window.URL.revokeObjectURL = vi.fn();
   const originalAppendChild = window.document.body.appendChild.bind(window.document.body);
