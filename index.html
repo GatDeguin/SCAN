@@ -1059,6 +1059,43 @@
       console.log('✅ Test export OK (deberías ver un archivo descargado)');
     });
   });
+
+  if(typeof window !== 'undefined'){
+    window.__SCAN__ = {
+      state,
+      parseCSV,
+      parseCSVAuto,
+      detectDelimiter,
+      uniqueColumnNames,
+      normalizeRowValue,
+      hydrateInventory,
+      rebuildIndex,
+      setInventoryStatus,
+      loadFile,
+      loadDefaultInventory,
+      paintInventory,
+      paintConformados,
+      paintDetails,
+      clearDetails,
+      addConformado,
+      exportCSV,
+      startCamera,
+      stopCamera,
+      toggleTorch,
+      switchCamera,
+      scanOnce,
+      detectLoop,
+      onDetect,
+      confetti,
+      setChip,
+      setScanLabel,
+      ensureZXing,
+      ensureSheetJS,
+      persistConformados,
+      restoreConformados,
+      stateSnapshot: () => JSON.parse(JSON.stringify(state)),
+    };
+  }
   </script>
 </body>
 </html>
