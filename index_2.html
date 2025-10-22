@@ -50,6 +50,40 @@
         justify-content: center;
       }
 
+      .device-selector {
+        display: grid;
+        gap: 8px;
+      }
+
+      .device-selector label {
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+
+      .selector-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .selector-row select {
+        flex: 1;
+      }
+
+      select {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.6);
+        color: inherit;
+        font-size: 1rem;
+        width: 100%;
+      }
+
+      select:focus {
+        outline: 2px solid rgba(56, 189, 248, 0.6);
+        outline-offset: 2px;
+      }
+
       button {
         padding: 10px 18px;
         border-radius: 999px;
@@ -73,6 +107,21 @@
         box-shadow: 0 12px 24px rgba(56, 189, 248, 0.35);
       }
 
+      .ghost {
+        background: rgba(56, 189, 248, 0.18);
+        color: inherit;
+        box-shadow: none;
+      }
+
+      .ghost:not([disabled]):hover {
+        box-shadow: none;
+        background: rgba(56, 189, 248, 0.28);
+      }
+
+      .ghost[disabled] {
+        opacity: 0.4;
+      }
+
       .status {
         padding: 14px;
         border-radius: 12px;
@@ -80,7 +129,7 @@
         border: 1px solid rgba(56, 189, 248, 0.35);
         min-height: 62px;
         display: grid;
-        gap: 6px;
+        gap: 4px;
       }
 
       .status small {
@@ -90,9 +139,77 @@
         letter-spacing: 0.08em;
       }
 
+      .metadata {
+        font-size: 0.85rem;
+        opacity: 0.85;
+        word-break: break-word;
+      }
+
       .error {
         background: rgba(248, 113, 113, 0.08);
         border-color: rgba(248, 113, 113, 0.35);
+      }
+
+      .history {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.55);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+      }
+
+      .history-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .history-header h2 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .history-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .history-empty {
+        margin: 0;
+        opacity: 0.7;
+        font-size: 0.9rem;
+      }
+
+      .history-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+        max-height: 220px;
+        overflow-y: auto;
+      }
+
+      .history-list li {
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.75);
+        border: 1px solid rgba(56, 189, 248, 0.12);
+        display: grid;
+        gap: 4px;
+      }
+
+      .history-list .code {
+        font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+        font-size: 0.95rem;
+        word-break: break-word;
+      }
+
+      .history-list .meta {
+        font-size: 0.75rem;
+        opacity: 0.75;
       }
     </style>
   </head>
@@ -106,10 +223,35 @@
         <button id="stop" disabled>Detener</button>
       </div>
 
-      <div class="status" id="status">
+      <div class="device-selector">
+        <label for="camera-select">Cámara en uso</label>
+        <div class="selector-row">
+          <select id="camera-select" disabled>
+            <option value="">Buscando cámaras…</option>
+          </select>
+          <button id="refresh-devices" type="button" class="ghost" title="Actualizar listado de cámaras">
+            Actualizar
+          </button>
+        </div>
+      </div>
+
+      <div class="status" id="status" role="status" aria-live="polite">
         <small>Resultado</small>
         <strong id="output">Esperando lectura…</strong>
+        <p id="metadata" class="metadata" hidden></p>
       </div>
+
+      <section class="history" aria-live="polite">
+        <div class="history-header">
+          <h2>Historial de lecturas</h2>
+          <div class="history-actions">
+            <button id="copy-last" type="button" class="ghost" disabled>Copiar último</button>
+            <button id="clear-history" type="button" class="ghost" disabled>Limpiar historial</button>
+          </div>
+        </div>
+        <p id="history-empty" class="history-empty">Todavía no hay códigos escaneados.</p>
+        <ol id="history-list" class="history-list"></ol>
+      </section>
     </main>
 
     <!-- Librería ZXing incluida localmente para evitar bloqueos del CDN -->
@@ -120,90 +262,424 @@
       const videoElement = document.getElementById('preview');
       const outputElement = document.getElementById('output');
       const statusBox = document.getElementById('status');
+      const metadataElement = document.getElementById('metadata');
+      const cameraSelect = document.getElementById('camera-select');
+      const refreshDevicesButton = document.getElementById('refresh-devices');
+      const copyLastButton = document.getElementById('copy-last');
+      const clearHistoryButton = document.getElementById('clear-history');
+      const historyList = document.getElementById('history-list');
+      const historyEmpty = document.getElementById('history-empty');
 
-      function setStatus(text, isError = false) {
+      function setStatus(text, options = {}) {
+        const config = typeof options === 'boolean' ? { isError: options } : options;
+        const { isError = false, meta } = config;
         outputElement.textContent = text;
-        statusBox.classList.toggle('error', isError);
+        statusBox.classList.toggle('error', Boolean(isError));
+
+        if (meta) {
+          metadataElement.textContent = meta;
+          metadataElement.hidden = false;
+        } else {
+          metadataElement.textContent = '';
+          metadataElement.hidden = true;
+        }
       }
 
       const ZXingBrowser = window.ZXingBrowser;
 
       if (!ZXingBrowser) {
         console.error('No se pudo cargar la librería ZXing.');
-        setStatus('No fue posible cargar el lector de códigos.', true);
+        setStatus('No fue posible cargar el lector de códigos.', { isError: true });
         startButton.disabled = true;
         stopButton.disabled = true;
+        cameraSelect.disabled = true;
+        refreshDevicesButton.disabled = true;
+        copyLastButton.disabled = true;
+        clearHistoryButton.disabled = true;
         throw new Error('ZXingBrowser library failed to load.');
       }
 
-      const { BrowserMultiFormatReader, BrowserCodeReader, NotFoundException } = ZXingBrowser;
+      const { BrowserMultiFormatReader, BrowserCodeReader, NotFoundException, BarcodeFormat } = ZXingBrowser;
       const reader = new BrowserMultiFormatReader();
-      let controls;
 
-      async function startScanner() {
-        startButton.disabled = true;
-        stopButton.disabled = false;
-        setStatus('Activando cámara…');
-
-        try {
-          const devices = await BrowserCodeReader.listVideoInputDevices();
-
-          if (!devices.length) {
-            throw new Error('No se encontraron cámaras disponibles.');
-          }
-
-          const preferredDevice = devices.find(device => /back|rear|environment/i.test(device.label)) ?? devices[0];
-
-          controls = await reader.decodeFromVideoDevice(
-            preferredDevice.deviceId,
-            videoElement,
-            (result, error) => {
-              if (result) {
-                setStatus(result.getText());
-                return;
-              }
-
-              if (!error) {
-                return;
-              }
-
-              const isNotFoundError =
-                (typeof NotFoundException === 'function' && error instanceof NotFoundException) ||
-                error.name === 'NotFoundException';
-
-              if (!isNotFoundError) {
-                console.error(error);
-                setStatus('Error al procesar el código.', true);
-              }
+      const formatLookup = new Map();
+      if (BarcodeFormat && typeof BarcodeFormat === 'object') {
+        Object.entries(BarcodeFormat)
+          .filter(([, value]) => typeof value === 'number')
+          .forEach(([name, value]) => {
+            if (!formatLookup.has(value)) {
+              formatLookup.set(value, name.replace(/_/g, ' '));
             }
-          );
-        } catch (err) {
-          console.error(err);
-          setStatus(err.message || 'No fue posible iniciar la cámara.', true);
-          startButton.disabled = false;
-          stopButton.disabled = true;
+          });
+      }
+
+      const history = [];
+      let controls;
+      let availableDevices = [];
+      let lastScannedValue;
+      let lastScannedAt = 0;
+      let isStarting = false;
+
+      const DUPLICATE_DELAY = 1500;
+      const timeFormatter = new Intl.DateTimeFormat('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+
+      function resolveFormatLabel(formatValue) {
+        if (formatLookup.has(formatValue)) {
+          return formatLookup.get(formatValue);
+        }
+
+        if (typeof formatValue === 'string' && formatValue.trim()) {
+          return formatValue.replace(/_/g, ' ');
+        }
+
+        if (typeof formatValue === 'number') {
+          return `Formato ${formatValue}`;
+        }
+
+        if (formatValue && typeof formatValue.toString === 'function') {
+          const label = formatValue.toString();
+          if (label && label !== '[object Object]') {
+            return label;
+          }
+        }
+
+        return 'Formato desconocido';
+      }
+
+      function updateHistoryUI() {
+        historyList.innerHTML = '';
+
+        if (!history.length) {
+          historyEmpty.hidden = false;
+        } else {
+          historyEmpty.hidden = true;
+
+          history.forEach(item => {
+            const listItem = document.createElement('li');
+
+            const code = document.createElement('span');
+            code.className = 'code';
+            code.textContent = item.text;
+            listItem.append(code);
+
+            const meta = document.createElement('span');
+            meta.className = 'meta';
+            meta.textContent = `${item.format} · ${timeFormatter.format(new Date(item.timestamp))}`;
+            listItem.append(meta);
+
+            historyList.append(listItem);
+          });
+        }
+
+        copyLastButton.disabled = history.length === 0;
+        clearHistoryButton.disabled = history.length === 0;
+      }
+
+      function addToHistory(entry) {
+        history.unshift(entry);
+        if (history.length > 25) {
+          history.pop();
+        }
+        updateHistoryUI();
+      }
+
+      function processResult(result) {
+        const rawText = typeof result.getText === 'function' ? result.getText() : '';
+        const trimmedText = typeof rawText === 'string' ? rawText.trim() : '';
+        const timestamp = Date.now();
+
+        if (trimmedText === lastScannedValue && timestamp - lastScannedAt < DUPLICATE_DELAY) {
+          return;
+        }
+
+        lastScannedValue = trimmedText;
+        lastScannedAt = timestamp;
+
+        const displayText = trimmedText || 'Código sin contenido legible';
+        const formatValue = typeof result.getBarcodeFormat === 'function' ? result.getBarcodeFormat() : undefined;
+        const formatLabel = resolveFormatLabel(formatValue);
+
+        addToHistory({
+          text: displayText,
+          value: rawText,
+          format: formatLabel,
+          timestamp,
+        });
+
+        setStatus(displayText, {
+          meta: `${formatLabel} · ${timeFormatter.format(new Date(timestamp))}`,
+        });
+      }
+
+      function handleDecodeResult(result, error) {
+        if (result) {
+          processResult(result);
+          return;
+        }
+
+        if (!error) {
+          return;
+        }
+
+        const isNotFoundError =
+          (typeof NotFoundException === 'function' && error instanceof NotFoundException) ||
+          error.name === 'NotFoundException';
+
+        if (!isNotFoundError) {
+          console.error(error);
+          setStatus('Error al procesar el código.', { isError: true });
         }
       }
 
-      function stopScanner() {
+      async function populateDevices({ silent = false } = {}) {
+        refreshDevicesButton.disabled = true;
+        cameraSelect.disabled = true;
+
+        try {
+          const devices = await BrowserCodeReader.listVideoInputDevices();
+          const previousDeviceId = cameraSelect.dataset.selectedDeviceId;
+          availableDevices = devices;
+
+          cameraSelect.innerHTML = '';
+
+          if (!devices.length) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No hay cámaras disponibles';
+            cameraSelect.append(option);
+
+            if (!silent) {
+              setStatus('No se encontraron cámaras disponibles.', { isError: true });
+            }
+
+            startButton.disabled = true;
+            stopButton.disabled = true;
+            return [];
+          }
+
+          devices.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = device.label || `Cámara ${index + 1}`;
+            cameraSelect.append(option);
+          });
+
+          const preferredDevice =
+            devices.find(device => device.deviceId === previousDeviceId) ||
+            devices.find(device => /back|rear|environment/i.test(device.label)) ||
+            devices[0];
+
+          const activeDeviceStillAvailable = previousDeviceId && devices.some(device => device.deviceId === previousDeviceId);
+
+          cameraSelect.value = preferredDevice.deviceId;
+          cameraSelect.dataset.selectedDeviceId = preferredDevice.deviceId;
+
+          cameraSelect.disabled = false;
+          startButton.disabled = Boolean(controls);
+
+          if (controls && previousDeviceId && !activeDeviceStillAvailable) {
+            stopScanner({ silent: true });
+            setStatus('La cámara seleccionada ya no está disponible. Se detuvo la lectura.', { isError: true });
+          }
+
+          return devices;
+        } catch (error) {
+          console.error(error);
+
+          cameraSelect.innerHTML = '';
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'Error al obtener cámaras';
+          cameraSelect.append(option);
+
+          if (!silent) {
+            setStatus('No se pudo obtener el listado de cámaras.', { isError: true });
+          }
+
+          startButton.disabled = true;
+          return [];
+        } finally {
+          refreshDevicesButton.disabled = false;
+        }
+      }
+
+      async function startScanner(requestedDeviceId) {
+        if (isStarting || controls) {
+          return;
+        }
+
+        isStarting = true;
+        startButton.disabled = true;
+        stopButton.disabled = true;
+        setStatus('Activando cámara…');
+
+        try {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('El navegador no soporta acceso a la cámara.');
+          }
+
+          if (!availableDevices.length) {
+            await populateDevices({ silent: true });
+          }
+
+          if (!availableDevices.length) {
+            throw new Error('No se encontraron cámaras disponibles.');
+          }
+
+          const selectedDevice =
+            availableDevices.find(device => device.deviceId === (requestedDeviceId || cameraSelect.value)) ||
+            availableDevices.find(device => /back|rear|environment/i.test(device.label)) ||
+            availableDevices[0];
+
+          cameraSelect.value = selectedDevice.deviceId;
+          cameraSelect.dataset.selectedDeviceId = selectedDevice.deviceId;
+
+          controls = await reader.decodeFromVideoDevice(
+            selectedDevice.deviceId,
+            videoElement,
+            handleDecodeResult
+          );
+
+          const cameraLabel = cameraSelect.selectedOptions[0]?.textContent || 'Cámara activa';
+          setStatus('Scanner listo. Esperando lectura…', { meta: cameraLabel });
+          stopButton.disabled = false;
+        } catch (error) {
+          console.error(error);
+          stopScanner({ silent: true });
+          setStatus(error.message || 'No fue posible iniciar la cámara.', { isError: true });
+        } finally {
+          isStarting = false;
+        }
+      }
+
+      function stopScanner(options = {}) {
+        const config = typeof options === 'boolean' ? { silent: options } : options;
+        const { silent = false } = config;
+
         if (controls) {
           controls.stop();
           controls = undefined;
         }
 
+        reader.reset();
         videoElement.srcObject = null;
-        setStatus('Scanner detenido.');
-        startButton.disabled = false;
+        lastScannedValue = undefined;
+        lastScannedAt = 0;
+
+        if (!silent) {
+          setStatus('Scanner detenido.');
+        }
+
+        if (!isStarting) {
+          startButton.disabled = false;
+        }
+
         stopButton.disabled = true;
       }
 
-      startButton.addEventListener('click', startScanner);
-      stopButton.addEventListener('click', stopScanner);
+      async function copyLastToClipboard() {
+        if (!history.length) {
+          return;
+        }
+
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+          setStatus('El portapapeles no está disponible en este navegador.', { isError: true });
+          return;
+        }
+
+        const [last] = history;
+
+        try {
+          await navigator.clipboard.writeText(typeof last.value === 'string' ? last.value : last.text);
+          setStatus('Código copiado al portapapeles.', { meta: last.text });
+        } catch (error) {
+          console.error(error);
+          setStatus('No fue posible copiar al portapapeles.', { isError: true });
+        }
+      }
+
+      function clearHistory() {
+        history.length = 0;
+        updateHistoryUI();
+        setStatus('Historial limpiado.');
+      }
+
+      async function initialize() {
+        updateHistoryUI();
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+          setStatus('El navegador no permite acceder a la cámara.', { isError: true });
+          startButton.disabled = true;
+          refreshDevicesButton.disabled = true;
+          cameraSelect.disabled = true;
+          return;
+        }
+
+        await populateDevices();
+
+        if (navigator.mediaDevices.addEventListener) {
+          navigator.mediaDevices.addEventListener('devicechange', () => {
+            populateDevices({ silent: true });
+          });
+        } else if ('ondevicechange' in navigator.mediaDevices) {
+          navigator.mediaDevices.ondevicechange = () => {
+            populateDevices({ silent: true });
+          };
+        }
+      }
+
+      startButton.addEventListener('click', () => {
+        startScanner().catch(error => {
+          console.error(error);
+          setStatus('Ocurrió un error inesperado al iniciar la cámara.', { isError: true });
+        });
+      });
+
+      stopButton.addEventListener('click', () => {
+        stopScanner();
+      });
+
+      refreshDevicesButton.addEventListener('click', () => {
+        populateDevices();
+      });
+
+      cameraSelect.addEventListener('change', () => {
+        cameraSelect.dataset.selectedDeviceId = cameraSelect.value;
+        if (controls) {
+          stopScanner({ silent: true });
+          startScanner(cameraSelect.value).catch(error => {
+            console.error(error);
+            setStatus('No fue posible cambiar de cámara.', { isError: true });
+          });
+        }
+      });
+
+      copyLastButton.addEventListener('click', () => {
+        copyLastToClipboard();
+      });
+
+      clearHistoryButton.addEventListener('click', () => {
+        clearHistory();
+      });
 
       window.addEventListener('beforeunload', () => {
-        if (controls) {
-          controls.stop();
+        stopScanner({ silent: true });
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && controls) {
+          stopScanner({ silent: true });
+          setStatus('Scanner detenido porque la pestaña no está activa.');
         }
+      });
+
+      initialize().catch(error => {
+        console.error(error);
+        setStatus('No fue posible preparar el lector de códigos.', { isError: true });
       });
     </script>
   </body>
