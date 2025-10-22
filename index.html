@@ -102,6 +102,10 @@
     @keyframes glow{0%{background: rgba(124,242,211,.22)} 100%{background: transparent}}
 
     .tip{font-size:var(--text-sm); color:var(--muted)}
+    .tip.status{transition:color .2s ease}
+    .tip.status.success{color:var(--ok)}
+    .tip.status.error{color:var(--danger)}
+    .tip.status.warn{color:var(--warn)}
     .hidden{display:none}
 
     /* Barra fija de acciones en móvil */
@@ -147,6 +151,7 @@
             <input id="filterInput" type="text" placeholder="Buscar en inventario" />
           </div>
         </div>
+        <div class="tip status" id="autoLoadMsg" aria-live="polite"></div>
         <div class="tip">Sugerencia: para uso 100% offline, preferí CSV (el soporte Excel usa un script CDN).</div>
       </section>
 
@@ -275,6 +280,8 @@
     detector: null,
     torchOn: false,
     lastScan: { code: null, time: 0 },
+    inventoryName: null,
+    exportDelimiter: ';',
   };
 
   // ---- Utilidades UI ----
@@ -298,59 +305,156 @@
       if(++tick<180){ requestAnimationFrame(loop)} else c.remove(); })();
   }
 
-  // ---- CSV Parser (ligero) ----
-  function parseCSV(text){
-    const rows = []; let cur = '', row = []; let inQ=false; for(let i=0;i<text.length;i++){
-      const ch=text[i], next=text[i+1];
+  // ---- CSV Parser (ligero, con autodetección de separador) ----
+  function stripBom(text){ return text.replace(/^\uFEFF/, ''); }
+
+  function detectDelimiter(text){
+    const sample = stripBom(text).split(/\r?\n/).find(line=> line.trim().length) || '';
+    const candidates = [',',';','\t','|'];
+    let best = ',', bestCount = 0;
+    for(const delimiter of candidates){
+      let count = 0; let inQ = false;
+      for(let i=0;i<sample.length;i++){
+        const ch = sample[i];
+        if(ch==='"'){
+          if(inQ && sample[i+1]==='"'){ i++; }
+          inQ = !inQ;
+        } else if(ch===delimiter && !inQ){ count++; }
+      }
+      if(count>bestCount){ best = delimiter; bestCount = count; }
+    }
+    return bestCount>0 ? best : ',';
+  }
+
+  function parseCSV(text, delimiter=','){
+    const clean = stripBom(text);
+    const rows = [];
+    let cur = '', row = [], inQ=false;
+    for(let i=0;i<clean.length;i++){
+      const ch = clean[i], next = clean[i+1];
       if(ch==='"'){
         if(inQ && next==='"'){ cur+='"'; i++; }
-        else inQ = !inQ;
-      } else if(ch===',' && !inQ){ row.push(cur); cur=''; }
-      else if((ch==='\n' || ch==='\r') && !inQ){ if(cur!=='' || row.length){ row.push(cur); rows.push(row); row=[]; cur=''; } }
-      else cur+=ch;
+        else { inQ = !inQ; }
+      } else if(ch===delimiter && !inQ){
+        row.push(cur); cur='';
+      } else if((ch==='\n' || ch==='\r') && !inQ){
+        if(ch==='\r' && next==='\n'){ i++; }
+        if(cur!=='' || row.length){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      } else {
+        cur+=ch;
+      }
     }
-    if(cur!=='' || row.length) { row.push(cur); rows.push(row); }
+    if(cur!=='' || row.length){ row.push(cur); rows.push(row); }
     return rows;
+  }
+
+  function parseCSVAuto(text){
+    const delimiter = detectDelimiter(text);
+    const rows = parseCSV(text, delimiter).filter(r=> r.length && r.some(c=> String(c ?? '').trim()!==''));
+    return { rows, delimiter };
   }
 
   // ---- Lectura de archivos ----
   async function loadFile(file){
-    const name = file.name.toLowerCase();
-    if(name.endsWith('.csv')){
-      const text = await file.text();
-      const rows = parseCSV(text).filter(r=> r.length && r.some(c=>c!==''));
-      hydrateInventory(rows);
-    } else if(name.endsWith('.xlsx') || name.endsWith('.xls')){
-      await ensureSheetJS();
-      if(!window.XLSX){ alert('No se pudo cargar el lector de Excel. Exportá a CSV y volvé a intentar.'); return; }
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:'array'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      hydrateInventory(rows);
-    } else {
-      alert('Formato no soportado. Usá CSV o Excel (.xlsx).');
+    if(!file) return;
+    try{
+      const name = file.name;
+      const lower = name.toLowerCase();
+      if(lower.endsWith('.csv')){
+        const text = await file.text();
+        const {rows, delimiter} = parseCSVAuto(text);
+        hydrateInventory(rows, { name, delimiter });
+      } else if(lower.endsWith('.xlsx') || lower.endsWith('.xls')){
+        await ensureSheetJS();
+        if(!window.XLSX){
+          alert('No se pudo cargar el lector de Excel. Exportá a CSV y volvé a intentar.');
+          setInventoryStatus('No se pudo cargar el lector de Excel. Preferí CSV para uso offline.', 'warn');
+          return;
+        }
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        hydrateInventory(rows, { name });
+      } else {
+        alert('Formato no soportado. Usá CSV o Excel (.xlsx).');
+        setInventoryStatus('Formato no soportado. Seleccioná un CSV o Excel.', 'error');
+      }
+    }catch(err){
+      console.error('Error al leer archivo', err);
+      alert('Ocurrió un problema al leer el archivo seleccionado. Verificá el formato e intentá nuevamente.');
+      setInventoryStatus('No se pudo cargar el archivo seleccionado.', 'error');
     }
   }
 
-  function hydrateInventory(rows){
-    if(!rows.length){ alert('El archivo está vacío.'); return; }
+  function uniqueColumnNames(rawHeader){
+    const seen = new Set();
+    return rawHeader.map((name, idx)=>{
+      let base = String(name ?? '').replace(/\uFEFF/g,'').trim();
+      if(!base){ base = `col_${idx+1}`; }
+      let final = base;
+      let counter = 2;
+      while(seen.has(final)){
+        final = `${base}_${counter++}`;
+      }
+      seen.add(final);
+      return final;
+    });
+  }
+
+  function normalizeRowValue(value){
+    if(value===null || value===undefined) return '';
+    if(typeof value === 'string') return value.replace(/\uFEFF/g,'').trim();
+    return String(value);
+  }
+
+  function setInventoryStatus(text='', tone='info'){
+    const msg = $('#autoLoadMsg');
+    if(!msg) return;
+    msg.textContent = text;
+    msg.classList.remove('success','error','warn');
+    if(tone==='success') msg.classList.add('success');
+    else if(tone==='error') msg.classList.add('error');
+    else if(tone==='warn') msg.classList.add('warn');
+  }
+
+  function hydrateInventory(rows, {name='inventario', delimiter}={}){
+    if(!rows.length){
+      alert('El archivo está vacío.');
+      setInventoryStatus('El archivo no contiene registros.', 'error');
+      return;
+    }
     const [header, ...data] = rows;
-    state.columns = header.map(h=> String(h||'col').trim());
-    state.inventory = data.filter(r=> r.some(c=>String(c).trim()!==''))
-                          .map(r=> Object.fromEntries(state.columns.map((c,i)=>[c, r[i]??''])));
+    state.columns = uniqueColumnNames(header);
+    state.inventory = data
+      .filter(r=> Array.isArray(r) && r.some(c=> String(c ?? '').trim()!==''))
+      .map(r=> Object.fromEntries(state.columns.map((c,i)=>[c, normalizeRowValue(r[i])] )));
+    if(!state.columns.length){
+      setInventoryStatus('No se detectaron columnas en el archivo.', 'error');
+      return;
+    }
+    state.inventoryName = name;
+    if(delimiter){ state.exportDelimiter = delimiter; }
+    $('#filterInput').value = '';
     // Detectar columna probable de código
     const lc = state.columns.map(c=>c.toLowerCase());
-    const guess = ['codigo','código','barcode','barra','ean','sku','id','inventario','cod_barra','code'].find(k=> lc.includes(k));
+    const guess = ['codigo','código','barcode','barra','ean','sku','id','inventario','cod_barra','code','nro.inventario']
+      .find(k=> lc.includes(k));
     state.key = guess || state.columns[0];
     rebuildIndex();
     paintInventory();
     fillKeySelect();
+    paintConformados();
     $('#invCount').textContent = `${state.inventory.length} ítems`;
+    setInventoryStatus(`Inventario cargado${name?` (${name})`:''}: ${state.inventory.length} ítems disponibles.`, 'success');
   }
 
   function rebuildIndex(){
     state.index = new Map();
+    if(!state.columns.includes(state.key)){
+      state.key = state.columns[0] || null;
+    }
+    if(!state.key) return;
     for(const row of state.inventory){
       const code = String(row[state.key] ?? '').trim();
       if(code) state.index.set(code, row);
@@ -360,11 +464,21 @@
   function fillKeySelect(){
     const sel = $('#keySelect'); sel.innerHTML = '';
     state.columns.forEach(c=> sel.appendChild(el('option',{value:c, text:c})));
-    sel.value = state.key;
+    sel.disabled = state.columns.length===0;
+    sel.value = state.key || '';
   }
 
   function paintInventory(){
     const tbl = $('#invTbl'); tbl.innerHTML = '';
+    if(!state.columns.length){
+      const tr = el('tr');
+      const td = el('td',{text:'Cargá un inventario para ver la vista previa.'});
+      td.colSpan = 1;
+      tr.appendChild(td);
+      tbl.appendChild(tr);
+      $('#visibleCount').textContent = '0 visibles';
+      return;
+    }
     const head = el('tr');
     const cols = state.columns.slice(0, 6);
     cols.forEach(c=> head.appendChild(el('th',{text:c})));
@@ -523,9 +637,10 @@
     if(!state.conformados.length){ alert('No hay registros para exportar.'); return; }
     const cols = Array.from(new Set(['timestamp','codigo','_match', ...state.columns]));
     const esc=v=> '"'+String(v??'').replace(/"/g,'""')+'"';
-    const lines = [cols.map(esc).join(',')];
-    state.conformados.forEach(rec=>{ lines.push(cols.map(c=> esc(rec[c])).join(',')); });
-    const blob = new Blob([lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+    const delim = state.exportDelimiter || ',';
+    const lines = [cols.map(esc).join(delim)];
+    state.conformados.forEach(rec=>{ lines.push(cols.map(c=> esc(rec[c])).join(delim)); });
+    const blob = new Blob(['\uFEFF'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob);
     const a = el('a',{href:url, download:'conformado.csv'}); document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
@@ -546,9 +661,28 @@
   }
 
   // ---- Eventos ----
+  async function loadDefaultInventory(){
+    try{
+      const res = await fetch('inventario.csv', {cache:'no-store'});
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      if(!text.trim()) throw new Error('Archivo vacío');
+      const {rows, delimiter} = parseCSVAuto(text);
+      hydrateInventory(rows, { name: 'inventario.csv', delimiter });
+    }catch(err){
+      console.info('Inventario automático no disponible:', err);
+      const manualMsg = location.protocol === 'file:'
+        ? 'Abrí este archivo desde un servidor o seleccioná el inventario manualmente.'
+        : 'Seleccioná un archivo usando el botón "Seleccionar" o arrastralo al recuadro.';
+      setInventoryStatus(manualMsg, 'warn');
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', async ()=>{
     restoreConformados();
     await initDevices();
+    setInventoryStatus('Buscando inventario predeterminado…', 'info');
+    loadDefaultInventory();
     $('#keySelect').addEventListener('change', e=>{ state.key = e.target.value; rebuildIndex(); });
     $('#filterInput').addEventListener('input', paintInventory);
 
@@ -592,19 +726,24 @@
     // ===== Pruebas =====
     $('#btnTestCSV').addEventListener('click', ()=>{
       const sample = 'codigo,desc,qty\r\n123,Item A,5\r\n"124,7",Item B,10\r\n125,"Item, C",0\r\n';
-      const rows = parseCSV(sample);
-      console.assert(rows.length===4, 'Debería parsear 4 filas contando header');
-      console.assert(rows[1][0]==='123', 'Fila 1 código 123');
-      console.assert(rows[2][0]==='124,7', 'Campo con coma entre comillas');
-      console.assert(rows[3][1]==='Item, C', 'Descripción con coma entre comillas');
-      console.log('✅ Test CSV OK', rows);
+      const parsedA = parseCSVAuto(sample);
+      console.assert(parsedA.rows.length===4, 'CSV coma: 4 filas contando header');
+      console.assert(parsedA.rows[2][0]==='124,7', 'CSV coma: campo con coma entre comillas');
+
+      const sampleB = '\uFEFFcodigo;desc;qty\n001;Item A;5\n002;"Item; B";3\n';
+      const parsedB = parseCSVAuto(sampleB);
+      console.assert(parsedB.delimiter===';', 'CSV punto y coma detectado');
+      console.assert(parsedB.rows[2][1]==='Item; B', 'CSV punto y coma respeta comillas internas');
+
+      console.log('✅ Test CSV OK', {coma: parsedA, puntoYComa: parsedB});
     });
 
     $('#btnTestExport').addEventListener('click', ()=>{
       state.columns = ['codigo','desc'];
+      state.exportDelimiter = ';';
       state.conformados = [
-        {timestamp:'2025-10-22T12:00:00Z', codigo:'ABC', _match:'1', codigo:'ABC', desc:'Algo'},
-        {timestamp:'2025-10-22T12:01:00Z', codigo:'XYZ', _match:'0', codigo:'XYZ', desc:'Otra'}
+        {timestamp:'2025-10-22T12:00:00Z', codigo:'ABC', _match:'1', desc:'Algo'},
+        {timestamp:'2025-10-22T12:01:00Z', codigo:'XYZ', _match:'0', desc:'Otra'}
       ];
       exportCSV();
       console.log('✅ Test export OK (deberías ver un archivo descargado)');
