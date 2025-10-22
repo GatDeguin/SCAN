@@ -1208,12 +1208,15 @@ class ScanControlApp {
     if (!error) return true;
     if (error?.message === 'ZXING_TIMEOUT') return true;
     const name = error?.name;
-    if (ZX && (
-      error instanceof ZX.NotFoundException
-      || error instanceof ZX.ChecksumException
-      || error instanceof ZX.FormatException
-    )) {
-      return true;
+    if (ZX) {
+      const zxingErrorConstructors = [
+        ZX.NotFoundException,
+        ZX.ChecksumException,
+        ZX.FormatException,
+      ].filter((ctor) => typeof ctor === 'function');
+      if (zxingErrorConstructors.some((ctor) => error instanceof ctor)) {
+        return true;
+      }
     }
     if (name && ['NotFoundException', 'ChecksumException', 'FormatException'].includes(name)) {
       return true;
