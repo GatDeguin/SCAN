@@ -278,6 +278,8 @@
     currentDeviceId: null,
     scanning: false,
     detector: null,
+    fallbackReader: null,
+    fallbackErrorShown: false,
     torchOn: false,
     lastScan: { code: null, time: 0 },
     inventoryName: null,
@@ -507,21 +509,69 @@
 
   async function startCamera(){
     try{
-      const constraints = { video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} } };
-      if(state.currentDeviceId) constraints.video.deviceId = {exact: state.currentDeviceId};
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const videoConstraints = { width:{ideal:1280}, height:{ideal:720}, facingMode:'environment' };
+      if(state.currentDeviceId){
+        delete videoConstraints.facingMode;
+        videoConstraints.deviceId = { exact: state.currentDeviceId };
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
       const v = $('#video'); v.srcObject = stream; await v.play();
+      const track = stream.getVideoTracks?.()[0];
+      state.currentDeviceId = track?.getSettings?.().deviceId || state.currentDeviceId;
       $('#pulse').classList.add('on'); $('#scanLabel').textContent = 'Escaneando…';
-      $('#startBtn').disabled = true; $('#stopBtn').disabled = false; $('#flashBtn').disabled = false;
-      state.scanning = true; detectLoop();
+      $('#startBtn').disabled = true; $('#stopBtn').disabled = false;
+      $('#flashBtn').textContent = 'Flash';
+      state.torchOn = false;
+      let torchAvailable = !!track;
+      const caps = track?.getCapabilities?.();
+      if(track && caps && ('torch' in caps)){
+        torchAvailable = !!caps.torch;
+      }
+      $('#flashBtn').disabled = !torchAvailable;
+      state.scanning = true;
+      state.detector = null;
+      if(state.fallbackReader?.reset) state.fallbackReader.reset();
+      state.fallbackReader = null;
+      state.fallbackErrorShown = false;
+      _lastDetectTs = 0;
+      if(!('BarcodeDetector' in window)){
+        const ZX = await ensureZXing();
+        if(ZX && ZX.BrowserMultiFormatReader){
+          state.fallbackReader = new ZX.BrowserMultiFormatReader();
+          if('timeBetweenDecodingAttempts' in state.fallbackReader){
+            state.fallbackReader.timeBetweenDecodingAttempts = DETECT_EVERY_MS;
+          }
+          if('timeBetweenScansMillis' in state.fallbackReader){
+            state.fallbackReader.timeBetweenScansMillis = DETECT_EVERY_MS;
+          }
+          setChip('#apiStatus','API: ZXing (fallback)', true);
+        } else {
+          setChip('#apiStatus','API: no disponible (sin ZXing)', false);
+          if(!state.fallbackErrorShown){
+            alert('Este navegador no soporta BarcodeDetector y no se pudo cargar la librería ZXing. Usá el ingreso manual.');
+            state.fallbackErrorShown = true;
+          }
+          stopCamera();
+          return;
+        }
+      }
+      await initDevices();
+      detectLoop();
     }catch(e){ alert('No se pudo acceder a la cámara. Revisá permisos.'); console.error(e); }
   }
 
   function stopCamera(){
-    const v = $('#video'); const s = v.srcObject; if(s){ s.getTracks().forEach(t=>t.stop()); v.srcObject=null; }
+    const v = $('#video');
+    const s = v.srcObject;
+    if(s){ s.getTracks().forEach(t=>t.stop()); v.srcObject=null; }
     $('#pulse').classList.remove('on'); $('#scanLabel').textContent = 'Cámara inactiva';
-    $('#startBtn').disabled = false; $('#stopBtn').disabled = true; $('#flashBtn').disabled = true;
+    $('#startBtn').disabled = false; $('#stopBtn').disabled = true;
+    $('#flashBtn').disabled = true; $('#flashBtn').textContent = 'Flash';
+    state.torchOn = false;
     state.scanning = false;
+    state.detector = null;
+    if(state.fallbackReader?.reset) state.fallbackReader.reset();
+    state.fallbackReader = null;
   }
 
   async function toggleTorch(){
@@ -547,27 +597,84 @@
   async function detectLoop(){
     if(!state.scanning) return;
     try{
-      if(!state.detector){
-        if('BarcodeDetector' in window){
+      const video = $('#video');
+      const now = performance.now();
+
+      if(state.detector){
+        if((now - _lastDetectTs) > DETECT_EVERY_MS && video.readyState >= 2){
+          _lastDetectTs = now;
+          try{
+            const bitmap = await createImageBitmap(video);
+            const codes = await state.detector.detect(bitmap);
+            bitmap.close?.();
+            if(codes && codes.length && state.scanning){
+              const first = codes[0];
+              onDetect(first.rawValue || first.displayValue);
+            }
+          }catch(err){
+            console.warn('Error detectando con BarcodeDetector', err);
+          }
+        }
+      } else if('BarcodeDetector' in window && !state.fallbackReader){
+        try{
           const formats = ['code_128','ean_13','ean_8','upc_a','upc_e','code_39','code_93','itf','codabar','qr_code','data_matrix','pdf417'];
           state.detector = new BarcodeDetector({formats});
           setChip('#apiStatus','API: BarcodeDetector', true);
-        } else {
-          setChip('#apiStatus','API: no disponible (usá ingreso manual)', false);
+          _lastDetectTs = 0;
+        }catch(err){
+          console.warn('BarcodeDetector no disponible, usando ZXing', err);
+          state.detector = null;
         }
       }
-      const now = performance.now();
-      if(state.detector && (now - _lastDetectTs) > DETECT_EVERY_MS){
-        _lastDetectTs = now;
-        const v = $('#video');
-        if(v.readyState >= 2){
-          const bitmap = await createImageBitmap(v);
-          const codes = await state.detector.detect(bitmap);
-          bitmap.close?.();
-          if(codes && codes.length){ onDetect(codes[0].rawValue || codes[0].displayValue); }
+
+      if(!state.detector){
+        if(!state.fallbackReader){
+          const ZX = await ensureZXing();
+          if(ZX && ZX.BrowserMultiFormatReader){
+            state.fallbackReader = new ZX.BrowserMultiFormatReader();
+            if('timeBetweenDecodingAttempts' in state.fallbackReader){
+              state.fallbackReader.timeBetweenDecodingAttempts = DETECT_EVERY_MS;
+            }
+            if('timeBetweenScansMillis' in state.fallbackReader){
+              state.fallbackReader.timeBetweenScansMillis = DETECT_EVERY_MS;
+            }
+            setChip('#apiStatus','API: ZXing (fallback)', true);
+            state.fallbackErrorShown = false;
+            _lastDetectTs = 0;
+          } else {
+            setChip('#apiStatus','API: no disponible (sin ZXing)', false);
+            if(!state.fallbackErrorShown){
+              alert('Este navegador no soporta BarcodeDetector y no se pudo cargar la librería ZXing. Usá el ingreso manual.');
+              state.fallbackErrorShown = true;
+            }
+            stopCamera();
+            return;
+          }
+        }
+        if(state.fallbackReader && (now - _lastDetectTs) > DETECT_EVERY_MS && video.readyState >= 2){
+          _lastDetectTs = now;
+          try{
+            const result = await state.fallbackReader.decodeFromVideoElement(video);
+            const text = result?.text || result?.getText?.();
+            if(text && state.scanning){ onDetect(text); }
+          }catch(err){
+            const ZX = window.ZXing;
+            const name = err?.name;
+            if(ZX && (err instanceof ZX.NotFoundException || err instanceof ZX.ChecksumException || err instanceof ZX.FormatException)){
+              // Errores esperados cuando no hay código en el frame
+            } else if(name && ['NotFoundException','ChecksumException','FormatException'].includes(name)){
+              // Errores esperados sin ZXing global disponible
+            } else if(err?.message?.includes('No MultiFormat Readers were able to detect')){
+              // ZXing no encontró código en este frame
+            } else {
+              console.warn('Error detectando con ZXing', err);
+            }
+          }
         }
       }
-    }catch(e){ /* silencioso */ }
+    }catch(err){
+      console.warn('detectLoop error', err);
+    }
     requestAnimationFrame(detectLoop);
   }
 
@@ -658,6 +765,25 @@
     await new Promise((resolve)=>{
       const s = document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload=resolve; s.onerror=resolve; document.head.appendChild(s);
     });
+  }
+
+  let ensureZXingPromise = null;
+  async function ensureZXing(){
+    if(window.ZXing && window.ZXing.BrowserMultiFormatReader) return window.ZXing;
+    if(ensureZXingPromise) return ensureZXingPromise;
+    ensureZXingPromise = new Promise((resolve)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js';
+      s.onload = ()=> resolve(window.ZXing || null);
+      s.onerror = ()=> resolve(null);
+      document.head.appendChild(s);
+    });
+    const lib = await ensureZXingPromise;
+    if(!lib || !lib.BrowserMultiFormatReader){
+      ensureZXingPromise = null;
+      return null;
+    }
+    return lib;
   }
 
   // ---- Eventos ----
