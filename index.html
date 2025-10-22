@@ -4,277 +4,696 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mini App Inventario · Escáner + CSV/XLSX</title>
-  <style>
-    /* =========================
-       Diseño responsive, mobile‑first
-       ========================= */
+    <style>
     :root{
-      --bg: #0b1020;
-      --panel: #101736;
-      --muted: #8a96b9;
-      --text: #f2f5ff;
-      --brand: #7cf2d3;
-      --accent: #9aa8ff;
-      --danger: #ff6b6b;
-      --warn: #ffbf69;
-      --ok: #38d996;
-      --card: #0f142a;
-      --shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
-      --radius: 16px;
-      --space: clamp(10px, 2.2vw, 18px);
-      --text-sm: clamp(12px, 1.4vw, 13px);
-      --text-md: clamp(14px, 1.6vw, 15px);
-      --text-lg: clamp(16px, 2vw, 18px);
-      --text-xl: clamp(18px, 3vw, 22px);
+      --bg: #020518;
+      --bg-alt: #0c1124;
+      --surface: rgba(14, 20, 40, 0.9);
+      --surface-strong: rgba(16, 24, 46, 0.95);
+      --border: rgba(142, 167, 255, 0.18);
+      --brand: #6ef7d5;
+      --accent: #8ea7ff;
+      --text: #f5f7ff;
+      --text-muted: #9fa9c6;
+      --danger: #ff6b81;
+      --warn: #f9b24e;
+      --success: #38d996;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --space-xs: 6px;
+      --space-sm: clamp(8px, 1.8vw, 12px);
+      --space: clamp(12px, 2.4vw, 20px);
+      --space-lg: clamp(18px, 3vw, 26px);
+      --space-xl: clamp(24px, 5vw, 34px);
+      --font-xs: clamp(11px, 1.2vw, 12px);
+      --font-sm: clamp(12px, 1.6vw, 13px);
+      --font-md: clamp(14px, 1.9vw, 16px);
+      --font-lg: clamp(18px, 3.2vw, 22px);
+      --font-xl: clamp(22px, 5vw, 30px);
+      --shadow-soft: 0 18px 45px rgba(8, 10, 25, 0.55);
+      --shadow-raised: 0 12px 32px rgba(6, 10, 30, 0.45);
+      --transition: 160ms ease;
     }
-    html,body{height:100%}
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg: #eef1ff;
+        --bg-alt: #f7f8ff;
+        --surface: rgba(255,255,255,0.92);
+        --surface-strong: rgba(255,255,255,0.96);
+        --border: rgba(71, 91, 168, 0.18);
+        --text: #0d1538;
+        --text-muted: #53608c;
+      }
+      body{
+        color-scheme: light dark;
+      }
+    }
+    *{box-sizing:border-box;}
+    html,body{height:100%;}
     body{
-      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      color: var(--text);
-      background: radial-gradient(1200px 600px at 20% -10%, #1d2450 0%, transparent 50%),
-                  radial-gradient(1200px 600px at 120% 10%, #17324a 0%, transparent 45%),
-                  var(--bg);
+      margin:0;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1600px 800px at -10% 0%, rgba(111,134,255,0.22), transparent 55%),
+        radial-gradient(1300px 720px at 110% 5%, rgba(122,240,216,0.18), transparent 55%),
+        var(--bg);
+      line-height:1.55;
+      -webkit-font-smoothing: antialiased;
     }
-
-    /* Layout principal: grid fluido */
-    .app{display:grid; grid-template-columns: minmax(0,1fr); gap:var(--space); min-height:100dvh; padding:var(--space); box-sizing:border-box}
-    @media (min-width: 980px){
-      .app{grid-template-columns: 380px minmax(0,1fr)}
+    body::before{
+      content:'';
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background: linear-gradient(120deg, rgba(255,255,255,0.06), transparent 45%),
+                  radial-gradient(900px 600px at 50% -240px, rgba(132,159,255,0.22), transparent 65%);
+      mix-blend-mode:soft-light;
+      opacity:0.65;
     }
-
-    .panel{background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.00)); border:1px solid rgba(255,255,255,.06); border-radius: var(--radius); box-shadow: var(--shadow)}
-    .left{display:flex; flex-direction:column; gap:var(--space); padding:var(--space)}
-    .right{display:grid; grid-template-rows: auto 1fr; gap:var(--space); min-height: 50dvh}
-
-    h1{font-size:var(--text-lg); margin:0; letter-spacing:.2px; display:flex; align-items:center; gap:10px}
-    .pill{font-size:var(--text-sm); padding:6px 10px; background: rgba(255,255,255,.06); border-radius:999px; border:1px solid rgba(255,255,255,.08)}
-    .sub{font-size:var(--text-sm); color:var(--muted)}
-    .section{background: var(--panel); border-radius: 12px; padding:var(--space); box-shadow: inset 0 1px 0 rgba(255,255,255,.03), 0 6px 16px rgba(0,0,0,.25)}
-
-    .button{display:inline-flex; align-items:center; justify-content:center; gap:10px; padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.03)); color:var(--text); cursor:pointer; transition:.2s transform, .25s box-shadow, .2s background; text-decoration:none; user-select:none; font-size:var(--text-md); min-height:44px}
-    .button:hover{transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,.35)}
-    .button:active{transform: translateY(0)}
-    .button.primary{background: linear-gradient(180deg, rgba(124,242,211,.35), rgba(124,242,211,.12)); border-color: rgba(124,242,211,.55)}
-    .button.warn{background: linear-gradient(180deg, rgba(255,191,105,.35), rgba(255,191,105,.12)); border-color: rgba(255,191,105,.55)}
-    .button.danger{background: linear-gradient(180deg, rgba(255,107,107,.35), rgba(255,107,107,.12)); border-color: rgba(255,107,107,.55)}
-    .button.ghost{background: transparent}
-
-    .row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
-    .stack{display:flex; flex-direction:column; gap:8px}
-
-    .file-drop{border:1.5px dashed rgba(255,255,255,.2); border-radius:12px; padding:14px; text-align:center; color:var(--muted); transition:.2s}
-    .file-drop.drag{border-color: var(--brand); color:var(--brand); background: rgba(124,242,211,.06)}
-
-    input[type="file"]{display:none}
-    select, input[type="text"], input[type="number"], textarea{ width:100%; padding:12px; background: #0e1430; color: var(--text); border:1px solid rgba(255,255,255,.1); border-radius:10px; outline: none; transition:.2s border; font-size:var(--text-md)}
-    select:focus, input:focus, textarea:focus{ border-color: var(--accent)}
-
-    .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#111a39; border:1px solid rgba(255,255,255,.08); padding:2px 6px; border-radius:6px}
-    .grid{display:grid; grid-template-columns: 1fr; gap:10px}
-    @media (min-width:680px){ .grid{grid-template-columns: repeat(2, 1fr)} }
-
-    .video-wrap{position:relative; width:100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow:hidden; background: #0a0f24; border:1px solid rgba(255,255,255,.06)}
-    .scan-action{position:absolute; top:12px; right:12px; display:flex; z-index:2}
-    .button.scan-trigger{background: rgba(16,23,54,.78); border-color: rgba(255,255,255,.18); backdrop-filter: blur(8px)}
-    .button.scan-trigger:disabled{opacity:.6; cursor:not-allowed}
-    @media (max-width:640px){
-      .scan-action{top:10px; right:10px}
+    a{color:inherit;}
+    .app{
+      position:relative;
+      min-height:100dvh;
+      max-width:1200px;
+      margin:0 auto;
+      padding: clamp(20px, 4vw, 48px) clamp(16px, 5vw, 60px) clamp(120px, 18vw, 140px);
+      display:flex;
+      flex-direction:column;
+      gap:var(--space-lg);
     }
-    @media (min-width: 1200px){ .video-wrap{aspect-ratio: 21 / 9} }
-    video{width:100%; height:100%; object-fit:cover; filter: saturate(1.08) contrast(1.05)}
-    .scan-status{position:absolute; left:12px; bottom:12px; display:flex; gap:8px; align-items:center}
-    .pulse{width:10px; height:10px; border-radius:50%; background: var(--warn); box-shadow:0 0 0 0 rgba(255,191,105,.5); animation: pulse 1.6s infinite}
-    .pulse.on{background: var(--brand); box-shadow:0 0 0 0 rgba(124,242,211,.5)}
-    @keyframes pulse{0%{transform:scale(.9); box-shadow:0 0 0 0 rgba(255,255,255,.3)} 70%{transform:scale(1); box-shadow:0 0 0 16px rgba(255,255,255,0)} 100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
-
-    .card{background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.00)); border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:var(--space); box-shadow: var(--shadow)}
-
-    /* Bloque resultado adaptable */
-    .result{display:grid; grid-template-columns: 1fr; gap:var(--space)}
-    @media (min-width:1200px){ .result{grid-template-columns: 1.1fr .9fr} }
-    .details{display:flex; flex-direction:column; gap:10px; overflow:auto; max-height: 42dvh}
-    .details table{width:100%; border-collapse: collapse}
-    .details th, .details td{font-size:var(--text-sm); text-align:left; padding:8px 8px; border-bottom:1px solid rgba(255,255,255,.06)}
-    .details tr:hover{background: rgba(255,255,255,.03)}
-
-    .chip{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font-size:var(--text-sm); border:1px solid rgba(255,255,255,.1)}
-    .chip.ok{background: rgba(56,217,150,.12); border-color: rgba(56,217,150,.45)}
-    .chip.bad{background: rgba(255,107,107,.12); border-color: rgba(255,107,107,.45)}
-
-    .log{overflow:auto; max-height: 60dvh}
-    .log table{width:100%; border-collapse: collapse}
-    .log th, .log td{font-size:var(--text-sm); padding:8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:left}
-    .log tr.added{animation: glow .9s ease-out}
-    @keyframes glow{0%{background: rgba(124,242,211,.22)} 100%{background: transparent}}
-
-    .tip{font-size:var(--text-sm); color:var(--muted)}
-    .tip.status{transition:color .2s ease}
-    .tip.status.success{color:var(--ok)}
-    .tip.status.error{color:var(--danger)}
-    .tip.status.warn{color:var(--warn)}
-    .hidden{display:none}
-
-    /* Barra fija de acciones en móvil */
-    .mobile-actions{position:sticky; bottom:0; display:flex; gap:10px; padding-top:10px; background: linear-gradient(180deg, transparent, rgba(0,0,0,.35));}
-    @media (min-width:980px){ .mobile-actions{display:none} }
-
-    /* Accesibilidad: reduce motion */
+    @media (max-width:900px){
+      .app{
+        padding: clamp(16px, 4vw, 28px) clamp(14px, 5vw, 30px) calc(140px + env(safe-area-inset-bottom));
+      }
+    }
+    .topbar,
+    .panel{
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:var(--radius-lg);
+      box-shadow:var(--shadow-soft);
+      backdrop-filter:blur(26px);
+      -webkit-backdrop-filter:blur(26px);
+    }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+      .topbar,
+      .panel{
+        background:var(--surface-strong);
+      }
+    }
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:var(--space);
+      padding:var(--space);
+    }
+    .topbar__brand{
+      display:flex;
+      align-items:center;
+      gap:var(--space-sm);
+      min-width:0;
+    }
+    .topbar svg{
+      width:40px;
+      height:40px;
+      flex-shrink:0;
+    }
+    .topbar h1{
+      margin:0;
+      font-size:var(--font-xl);
+      letter-spacing:-0.01em;
+    }
+    .subtitle{
+      margin:0;
+      font-size:var(--font-sm);
+      color:var(--text-muted);
+    }
+    .stats{
+      display:flex;
+      align-items:center;
+      gap:var(--space-sm);
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .app-grid{
+      display:grid;
+      gap:var(--space-lg);
+    }
+    @media (min-width:1080px){
+      .app-grid{
+        grid-template-columns: minmax(280px, 360px) minmax(0,1fr);
+        align-items:start;
+      }
+      .workspace{
+        padding-right:2px;
+      }
+    }
+    .sidebar{
+      display:flex;
+      flex-direction:column;
+      gap:var(--space-lg);
+    }
+    .workspace{
+      display:flex;
+      flex-direction:column;
+      gap:var(--space-lg);
+    }
+    .section{
+      display:flex;
+      flex-direction:column;
+      gap:var(--space);
+    }
+    .section.panel{
+      padding:var(--space);
+    }
+    .section-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:var(--space-sm);
+      flex-wrap:wrap;
+    }
+    .section-title h2{
+      margin:0;
+      font-size:var(--font-lg);
+      font-weight:600;
+    }
+    .section-title p{
+      margin:0;
+      font-size:var(--font-sm);
+      color:var(--text-muted);
+    }
+    input[type="file"]{display:none;}
+    .file-drop{
+      border:1.6px dashed rgba(255,255,255,0.22);
+      border-radius:var(--radius-md);
+      padding:calc(var(--space) + 4px);
+      text-align:center;
+      color:var(--text-muted);
+      background:rgba(12,18,36,0.35);
+      transition:border var(--transition), color var(--transition), background var(--transition), transform var(--transition);
+    }
+    .file-drop:focus-visible{
+      outline:2px solid var(--accent);
+      outline-offset:2px;
+    }
+    .file-drop.drag{
+      border-color:var(--brand);
+      color:var(--brand);
+      background:rgba(110,247,213,0.08);
+      transform:translateY(-1px);
+    }
+    .field-grid{
+      display:grid;
+      gap:var(--space);
+    }
+    @media (min-width:640px){
+      .field-grid{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+      }
+    }
+    label{
+      font-size:var(--font-sm);
+      font-weight:500;
+      color:var(--text-muted);
+    }
+    select,
+    input[type="text"],
+    input[type="number"],
+    textarea{
+      width:100%;
+      padding:12px 14px;
+      font-size:var(--font-md);
+      font-family:inherit;
+      color:var(--text);
+      background:rgba(9,14,32,0.8);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:var(--radius-sm);
+      transition:border var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+    select:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible{
+      border-color:var(--accent);
+      box-shadow:0 0 0 2px rgba(142,167,255,0.35);
+      outline:none;
+    }
+    input::placeholder,
+    textarea::placeholder{
+      color:rgba(255,255,255,0.45);
+    }
+    input[readonly]{
+      color:var(--text-muted);
+    }
+    .button{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding:12px 16px;
+      min-height:46px;
+      font-size:var(--font-md);
+      font-weight:600;
+      border-radius:var(--radius-sm);
+      border:1px solid rgba(255,255,255,0.08);
+      background:linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+      color:inherit;
+      cursor:pointer;
+      transition:transform var(--transition), box-shadow var(--transition), background var(--transition), border var(--transition);
+      text-decoration:none;
+    }
+    .button:hover{
+      transform:translateY(-1px);
+      box-shadow:var(--shadow-raised);
+    }
+    .button:focus-visible{
+      outline:2px solid var(--accent);
+      outline-offset:2px;
+    }
+    .button:active{
+      transform:translateY(0);
+    }
+    .button:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+      box-shadow:none;
+    }
+    .button.primary{
+      background:linear-gradient(180deg, rgba(110,247,213,0.32), rgba(110,247,213,0.12));
+      border-color:rgba(110,247,213,0.48);
+      color:#041a16;
+    }
+    .button.warn{
+      background:linear-gradient(180deg, rgba(249,178,78,0.32), rgba(249,178,78,0.12));
+      border-color:rgba(249,178,78,0.45);
+      color:#2c1603;
+    }
+    .button.danger{
+      background:linear-gradient(180deg, rgba(255,107,129,0.32), rgba(255,107,129,0.12));
+      border-color:rgba(255,107,129,0.5);
+      color:#2e030d;
+    }
+    .button.ghost{
+      background:rgba(255,255,255,0.04);
+    }
+    .button.scan-trigger{
+      background:rgba(8,12,30,0.72);
+      border-color:rgba(255,255,255,0.14);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+    }
+    .row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:var(--space-sm);
+      flex-wrap:wrap;
+    }
+    .row.fit{justify-content:flex-start;}
+    .row.tight{gap:var(--space-sm);}
+    .row.compact{gap:var(--space-xs);}
+    .stack{
+      display:flex;
+      flex-direction:column;
+      gap:var(--space-sm);
+    }
+    .code-field{flex:1; min-width:min(260px, 100%);}
+    .action-block{width:min(340px,100%);}
+    @media (max-width:720px){
+      .action-block{width:100%;}
+    }
+    .kbd{
+      font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      background:rgba(12,18,40,0.72);
+      border:1px solid rgba(255,255,255,0.09);
+      border-radius:8px;
+      padding:3px 8px;
+      font-size:var(--font-xs);
+    }
+    .tip{
+      font-size:var(--font-sm);
+      color:var(--text-muted);
+    }
+    .tip strong{color:inherit;}
+    .tip.status.success{color:var(--success);}
+    .tip.status.error{color:var(--danger);}
+    .tip.status.warn{color:var(--warn);}
+    .pill,
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 12px;
+      border-radius:999px;
+      font-size:var(--font-sm);
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(255,255,255,0.06);
+      color:inherit;
+    }
+    .chip.ok{
+      border-color:rgba(56,217,150,0.5);
+      background:rgba(56,217,150,0.18);
+      color:#06291a;
+    }
+    .chip.bad{
+      border-color:rgba(255,107,129,0.5);
+      background:rgba(255,107,129,0.2);
+      color:#2e0a11;
+    }
+    .video-wrap{
+      position:relative;
+      border-radius:var(--radius-lg);
+      overflow:hidden;
+      background:rgba(7,12,28,0.75);
+      border:1px solid rgba(255,255,255,0.08);
+      aspect-ratio:3 / 4;
+      display:flex;
+    }
+    @media (min-width:720px){
+      .video-wrap{aspect-ratio:16 / 9;}
+    }
+    video{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      filter:saturate(1.08) contrast(1.04);
+    }
+    .scan-action{
+      position:absolute;
+      top:14px;
+      right:14px;
+      display:flex;
+      gap:10px;
+    }
+    .scan-status{
+      position:absolute;
+      left:16px;
+      bottom:16px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .pulse{
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      background:var(--warn);
+      box-shadow:0 0 0 0 rgba(249,178,78,0.45);
+      animation:pulse 1.8s ease-in-out infinite;
+    }
+    .pulse.on{
+      background:var(--brand);
+      box-shadow:0 0 0 0 rgba(110,247,213,0.45);
+    }
+    @keyframes pulse{
+      0%{transform:scale(0.9); box-shadow:0 0 0 0 rgba(255,255,255,0.28);}
+      60%{transform:scale(1); box-shadow:0 0 0 14px rgba(255,255,255,0);}
+      100%{box-shadow:0 0 0 0 rgba(255,255,255,0);}
+    }
+    .data-area{
+      padding:var(--space);
+      display:grid;
+      gap:var(--space);
+    }
+    .result{
+      display:grid;
+      gap:var(--space);
+    }
+    @media (min-width:1024px){
+      .result{
+        grid-template-columns:1.05fr 0.95fr;
+      }
+    }
+    .card{
+      border-radius:var(--radius-lg);
+      background:rgba(11,16,36,0.78);
+      border:1px solid rgba(255,255,255,0.08);
+      padding:var(--space);
+      display:flex;
+      flex-direction:column;
+      gap:var(--space);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .table-scroll{
+      overflow:auto;
+      border-radius:calc(var(--radius-md) - 4px);
+      border:1px solid rgba(255,255,255,0.05);
+      background:rgba(4,8,20,0.65);
+      max-height:42dvh;
+    }
+    .table-scroll table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:100%;
+    }
+    .table-scroll th,
+    .table-scroll td{
+      font-size:var(--font-sm);
+      text-align:left;
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,0.05);
+      white-space:nowrap;
+    }
+    .table-scroll tr:hover{
+      background:rgba(142,167,255,0.12);
+    }
+    .table-scroll::-webkit-scrollbar{
+      height:8px;
+      width:8px;
+    }
+    .table-scroll::-webkit-scrollbar-thumb{
+      background:rgba(142,167,255,0.28);
+      border-radius:999px;
+    }
+    .inventory-preview{
+      max-height:28dvh;
+    }
+    .log{
+      display:flex;
+      flex-direction:column;
+      gap:var(--space);
+    }
+    .log .table-scroll{
+      max-height:50dvh;
+    }
+    .log tr.added{
+      animation:glow .9s ease-out;
+    }
+    @keyframes glow{
+      0%{background:rgba(110,247,213,0.24);}
+      100%{background:transparent;}
+    }
+    .hidden{display:none!important;}
+    .mobile-actions{
+      position:fixed;
+      left:0;
+      right:0;
+      bottom:0;
+      z-index:30;
+      padding:12px clamp(16px, 6vw, 40px) calc(12px + env(safe-area-inset-bottom));
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      align-items:center;
+      background:linear-gradient(180deg, rgba(3,7,20,0), rgba(3,7,20,0.92) 35%, rgba(3,7,20,1) 90%);
+      backdrop-filter:blur(22px);
+      -webkit-backdrop-filter:blur(22px);
+      border-top:1px solid rgba(255,255,255,0.08);
+    }
+    .mobile-actions .button{flex:1;}
+    @media (min-width:980px){
+      .mobile-actions{display:none;}
+    }
+    footer{
+      font-size:var(--font-sm);
+      color:var(--text-muted);
+      text-align:center;
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+    footer strong{color:var(--text);}
+    details{
+      border-radius:var(--radius-md);
+      background:rgba(12,18,38,0.6);
+      border:1px solid rgba(255,255,255,0.08);
+      padding:var(--space);
+    }
+    details summary{
+      cursor:pointer;
+      list-style:none;
+      display:flex;
+      align-items:center;
+      gap:var(--space-sm);
+      font-weight:600;
+      font-size:var(--font-md);
+    }
+    details summary::-webkit-details-marker{display:none;}
+    details[open]{background:rgba(12,18,38,0.72);}
     @media (prefers-reduced-motion: reduce){
-      *{animation:none!important; transition:none!important}
+      *{animation:none!important; transition:none!important;}
     }
   </style>
 </head>
 <body>
   <div class="app">
-    <!-- LEFT: Controles (columna) -->
-    <aside class="panel left">
-      <div class="row">
-        <h1>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M12 2l2.3 4.7L19 7.3l-3.5 3.4.8 4.9L12 13.8l-4.3 1.8.8-4.9L5 7.3l4.7-.6L12 2z" stroke="url(#g1)" stroke-width="1.2"/>
-            <defs><linearGradient id="g1" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#7cf2d3"/><stop offset="1" stop-color="#9aa8ff"/></linearGradient></defs>
-          </svg>
-          Mini App Inventario
-        </h1>
+    <header class="topbar panel">
+      <div class="topbar__brand">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M12 2l2.3 4.7L19 7.3l-3.5 3.4.8 4.9L12 13.8l-4.3 1.8.8-4.9L5 7.3l4.7-.6L12 2z" stroke="url(#g1)" stroke-width="1.3"/>
+          <defs><linearGradient id="g1" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#7cf2d3"/><stop offset="1" stop-color="#9aa8ff"/></linearGradient></defs>
+        </svg>
+        <div class="stack">
+          <h1>Mini App Inventario</h1>
+          <p class="subtitle">Escáner portátil para control de stock y depósitos móviles.</p>
+        </div>
+      </div>
+      <div class="stats">
         <span class="pill" id="invCount" aria-live="polite">0 ítems</span>
       </div>
+    </header>
 
-      <!-- Carga Inventario -->
-      <section class="section stack" aria-label="Carga de inventario">
-        <div class="row">
-          <strong>Archivo (CSV / XLSX)</strong>
-          <label class="button ghost" for="fileInput">Seleccionar</label>
+    <div class="app-grid">
+      <aside class="sidebar" aria-label="Panel de control">
+        <section class="panel section stack" aria-label="Carga de inventario">
+          <div class="section-title">
+            <div class="stack">
+              <h2>Inventario</h2>
+              <p>Importá tu archivo CSV o Excel para habilitar coincidencias instantáneas.</p>
+            </div>
+            <label class="button ghost" for="fileInput">Seleccionar</label>
+          </div>
           <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
-        </div>
-        <div id="drop" class="file-drop" tabindex="0">Arrastrá y soltá el archivo aquí</div>
-        <div class="grid">
-          <div class="stack">
-            <label>Columna clave</label>
-            <select id="keySelect"></select>
-          </div>
-          <div class="stack">
-            <label>Filtro rápido</label>
-            <input id="filterInput" type="text" placeholder="Buscar en inventario" />
-          </div>
-        </div>
-        <div class="tip status" id="autoLoadMsg" aria-live="polite"></div>
-        <div class="tip">Sugerencia: para uso 100% offline, preferí CSV (el soporte Excel usa un script CDN).</div>
-      </section>
-
-      <!-- Escáner -->
-      <section class="section stack" aria-label="Escáner de códigos">
-        <div class="row" style="gap:10px">
-          <strong>Escáner</strong>
-          <span class="chip" id="apiStatus">API: detectando…</span>
-        </div>
-        <div class="row" style="gap:8px">
-          <button class="button primary" id="startBtn">Iniciar cámara</button>
-          <button class="button warn" id="stopBtn" disabled>Detener</button>
-          <button class="button" id="flashBtn" disabled>Flash</button>
-          <button class="button" id="switchBtn" disabled>Cambiar</button>
-        </div>
-        <div class="stack">
-          <label>Ingreso manual</label>
-          <div class="row" style="gap:8px">
-            <input id="manualInput" type="text" placeholder="Pegá o escribí un código y Enter" />
-            <button class="button" id="manualBtn">OK</button>
-          </div>
-          <div class="tip">Atajo: <span class="kbd">Enter</span> confirma. <span class="kbd">Ctrl/Cmd + C</span> conforma.</div>
-        </div>
-        <div class="mobile-actions">
-          <button class="button primary" id="confirmBtnMobile" disabled>Conformar</button>
-          <button class="button" id="exportBtnMobile">Descargar CSV</button>
-        </div>
-      </section>
-
-      <!-- Exportación -->
-      <section class="section row" aria-label="Acciones">
-        <button class="button primary" id="exportBtn">Descargar "conformado.csv"</button>
-        <button class="button danger" id="clearBtn">Limpiar conformados</button>
-      </section>
-
-      <div class="sub">Hecho con ❤️ para flujos rápidos en depósito y control.</div>
-    </aside>
-
-    <!-- RIGHT: Escáner + resultados -->
-    <main class="right">
-      <!-- Video/Scanner Panel -->
-      <div class="panel video-wrap">
-        <video id="video" playsinline muted></video>
-        <div class="scan-action">
-          <button class="button scan-trigger" id="scanOnceBtn" type="button" disabled>Ejecutar lectura</button>
-        </div>
-        <div class="scan-status">
-          <div id="pulse" class="pulse" aria-hidden="true"></div>
-          <span id="scanLabel" class="pill">Cámara inactiva</span>
-        </div>
-      </div>
-
-      <!-- Results + Log -->
-      <div class="panel" style="display:grid; grid-template-columns: 1fr; gap:var(--space); padding:var(--space)">
-        <div class="result">
-          <div class="card details">
-            <div class="row">
-              <strong>Detalles del código</strong>
-              <span id="matchChip" class="chip" aria-live="polite">—</span>
+          <div id="drop" class="file-drop" tabindex="0">Arrastrá y soltá el archivo aquí</div>
+          <div class="field-grid">
+            <div class="stack">
+              <label for="keySelect">Columna clave</label>
+              <select id="keySelect"></select>
             </div>
             <div class="stack">
-              <div class="row">
-                <div class="stack" style="flex:1; min-width: 200px">
-                  <label>Código detectado</label>
-                  <input id="detectedCode" type="text" readonly />
+              <label for="filterInput">Filtro rápido</label>
+              <input id="filterInput" type="text" placeholder="Buscar en inventario" />
+            </div>
+          </div>
+          <div class="tip status" id="autoLoadMsg" aria-live="polite"></div>
+          <div class="tip">Sugerencia: para uso 100% offline, preferí CSV (el soporte Excel usa un script CDN).</div>
+        </section>
+
+        <section class="panel section stack" aria-label="Escáner de códigos">
+          <div class="section-title">
+            <div class="stack">
+              <h2>Escáner</h2>
+              <p>Activá la cámara o ingresá códigos manualmente.</p>
+            </div>
+            <span class="chip" id="apiStatus">API: detectando…</span>
+          </div>
+          <div class="row fit tight">
+            <button class="button primary" id="startBtn" type="button">Iniciar cámara</button>
+            <button class="button warn" id="stopBtn" type="button" disabled>Detener</button>
+            <button class="button" id="flashBtn" type="button" disabled>Flash</button>
+            <button class="button" id="switchBtn" type="button" disabled>Cambiar</button>
+          </div>
+          <div class="stack">
+            <label for="manualInput">Ingreso manual</label>
+            <div class="row fit tight">
+              <input id="manualInput" type="text" placeholder="Pegá o escribí un código y Enter" />
+              <button class="button" id="manualBtn" type="button">OK</button>
+            </div>
+            <div class="tip">Atajo: <span class="kbd">Enter</span> confirma. <span class="kbd">Ctrl/Cmd + C</span> conforma.</div>
+          </div>
+          <div class="mobile-actions" role="group" aria-label="Acciones rápidas">
+            <button class="button primary" id="confirmBtnMobile" type="button" disabled>Conformar</button>
+            <button class="button" id="exportBtnMobile" type="button">Descargar CSV</button>
+          </div>
+        </section>
+
+        <section class="panel section stack" aria-label="Acciones">
+          <div class="row tight">
+            <button class="button primary" id="exportBtn" type="button">Descargar "conformado.csv"</button>
+            <button class="button danger" id="clearBtn" type="button">Limpiar conformados</button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <div class="panel video-wrap" aria-label="Visor de la cámara">
+          <video id="video" playsinline muted></video>
+          <div class="scan-action">
+            <button class="button scan-trigger" id="scanOnceBtn" type="button" disabled>Ejecutar lectura</button>
+          </div>
+          <div class="scan-status">
+            <div id="pulse" class="pulse" aria-hidden="true"></div>
+            <span id="scanLabel" class="pill">Cámara inactiva</span>
+          </div>
+        </div>
+
+        <div class="panel data-area">
+          <div class="result">
+            <div class="card details">
+              <div class="row tight">
+                <strong>Detalles del código</strong>
+                <span id="matchChip" class="chip" aria-live="polite">—</span>
+              </div>
+              <div class="stack">
+                <div class="row fit tight">
+                  <div class="stack code-field">
+                    <label for="detectedCode">Código detectado</label>
+                    <input id="detectedCode" type="text" readonly />
+                  </div>
+                  <div class="stack action-block">
+                    <label>Acción</label>
+                    <div class="row fit compact">
+                      <button class="button primary" id="confirmBtn" type="button" disabled>Marcar como conformado</button>
+                      <button class="button ghost" id="copyBtn" type="button" title="Copiar código" disabled>Copiar</button>
+                    </div>
+                  </div>
                 </div>
-                <div class="stack" style="width:min(340px, 100%)">
-                  <label>Acción</label>
-                  <div class="row" style="gap:8px">
-                    <button class="button primary" id="confirmBtn" disabled>Marcar como conformado</button>
-                    <button class="button ghost" id="copyBtn" title="Copiar código" disabled>Copiar</button>
+                <div id="detailTableWrap" class="stack">
+                  <label>Información asociada</label>
+                  <div class="tip" id="noData">Cargá un inventario y elegí la columna clave para ver detalles.</div>
+                  <div id="detailTable" class="table-scroll hidden">
+                    <table id="detailTbl"></table>
                   </div>
                 </div>
               </div>
-              <div id="detailTableWrap" class="stack">
-                <label>Información asociada</label>
-                <div class="tip" id="noData">Cargá un inventario y elegí la columna clave para ver detalles.</div>
-                <div id="detailTable" class="hidden">
-                  <table id="detailTbl"></table>
-                </div>
+            </div>
+            <div class="card">
+              <div class="row tight">
+                <strong>Inventario (vista rápida)</strong>
+                <span class="pill" id="visibleCount">0 visibles</span>
+              </div>
+              <div class="table-scroll inventory-preview">
+                <table id="invTbl"></table>
               </div>
             </div>
           </div>
-          <div class="card">
-            <div class="row">
-              <strong>Inventario (vista rápida)</strong>
-              <span class="pill" id="visibleCount">0 visibles</span>
+          <div class="card log">
+            <div class="row tight">
+              <strong>Conformados</strong>
+              <span class="pill" id="confCount">0</span>
             </div>
-            <div class="details" style="max-height: 28dvh">
-              <table id="invTbl"></table>
+            <div class="table-scroll">
+              <table id="confTbl"></table>
             </div>
           </div>
         </div>
-        <div class="card log">
-          <div class="row">
-            <strong>Conformados</strong>
-            <span class="pill" id="confCount">0</span>
-          </div>
-          <table id="confTbl"></table>
-        </div>
-      </div>
 
-      <!-- Pruebas integradas -->
-      <div class="panel section" style="margin-top:var(--space)">
-        <details>
-          <summary>🧪 Pruebas rápidas (CSV/Export) – abrir para ejecutar</summary>
-          <div class="stack" style="margin-top:10px">
-            <button class="button" id="btnTestCSV">Test parser CSV</button>
-            <button class="button" id="btnTestExport">Test export CSV</button>
-            <div class="tip">Los resultados se muestran en la consola del navegador y/o como descarga de un archivo de prueba.</div>
-          </div>
-        </details>
-      </div>
+        <section class="panel section stack">
+          <details>
+            <summary>🧪 Pruebas rápidas (CSV/Export) – abrir para ejecutar</summary>
+            <div class="stack">
+              <button class="button" id="btnTestCSV" type="button">Test parser CSV</button>
+              <button class="button" id="btnTestExport" type="button">Test export CSV</button>
+              <div class="tip">Los resultados se muestran en la consola del navegador y/o como descarga de un archivo de prueba.</div>
+            </div>
+          </details>
+        </section>
+      </main>
+    </div>
 
-    </main>
+    <footer>Hecho con ❤️ para flujos rápidos en depósito y control.</footer>
   </div>
-
   <!-- Script principal -->
   <script>
   const state = {
