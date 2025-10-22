@@ -160,7 +160,18 @@
             (result, error) => {
               if (result) {
                 setStatus(result.getText());
-              } else if (error && !(error instanceof NotFoundException)) {
+                return;
+              }
+
+              if (!error) {
+                return;
+              }
+
+              const isNotFoundError =
+                (typeof NotFoundException === 'function' && error instanceof NotFoundException) ||
+                error.name === 'NotFoundException';
+
+              if (!isNotFoundError) {
                 console.error(error);
                 setStatus('Error al procesar el código.', true);
               }
