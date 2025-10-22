@@ -139,22 +139,45 @@
       justify-content:flex-end;
     }
     .app-grid{
-      display:grid;
-      gap:var(--space-lg);
-    }
-    @media (min-width:1080px){
-      .app-grid{
-        grid-template-columns: minmax(280px, 360px) minmax(0,1fr);
-        align-items:start;
-      }
-      .workspace{
-        padding-right:2px;
-      }
-    }
-    .sidebar{
       display:flex;
       flex-direction:column;
       gap:var(--space-lg);
+    }
+    .control-panel{
+      padding:var(--space);
+      display:flex;
+      flex-direction:column;
+      gap:var(--space);
+    }
+    .control-grid{
+      display:grid;
+      gap:var(--space);
+    }
+    @media (min-width:980px){
+      .control-grid{
+        grid-template-columns:1.1fr 1fr 0.9fr;
+      }
+    }
+    .control-block{
+      display:flex;
+      flex-direction:column;
+      gap:var(--space-sm);
+      padding:var(--space);
+      border-radius:var(--radius-md);
+      background:rgba(12,18,36,0.55);
+      border:1px solid rgba(255,255,255,0.08);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .control-block h2{
+      margin:0;
+      font-size:var(--font-lg);
+      font-weight:600;
+    }
+    .control-block p{
+      margin:0;
+    }
+    .control-block .row{
+      flex-wrap:wrap;
     }
     .workspace{
       display:flex;
@@ -281,6 +304,7 @@
       cursor:not-allowed;
       box-shadow:none;
     }
+    .button.full{width:100%;}
     .button.primary{
       background:linear-gradient(180deg, rgba(110,247,213,0.32), rgba(110,247,213,0.12));
       border-color:rgba(110,247,213,0.48);
@@ -352,6 +376,11 @@
       border:1px solid rgba(255,255,255,0.14);
       background:rgba(255,255,255,0.06);
       color:inherit;
+    }
+    .pill.muted{
+      background:rgba(255,255,255,0.05);
+      border-color:rgba(255,255,255,0.1);
+      color:var(--text-muted);
     }
     .chip.ok{
       border-color:rgba(56,217,150,0.5);
@@ -486,6 +515,59 @@
       0%{background:rgba(110,247,213,0.24);}
       100%{background:transparent;}
     }
+    .inventory-drawer{
+      position:fixed;
+      inset:0;
+      display:flex;
+      justify-content:flex-end;
+      padding:clamp(16px, 6vw, 32px);
+      background:rgba(2,5,24,0.6);
+      backdrop-filter:blur(22px);
+      -webkit-backdrop-filter:blur(22px);
+      z-index:90;
+      overflow:auto;
+    }
+    .inventory-drawer__panel{
+      width:min(420px, 100%);
+      max-height:100%;
+      overflow:auto;
+      display:flex;
+      flex-direction:column;
+      gap:var(--space);
+    }
+    .inventory-drawer__panel .drawer-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:var(--space-sm);
+    }
+    .inventory-drawer__panel .drawer-header h2{
+      margin:0;
+      font-size:var(--font-lg);
+      font-weight:600;
+    }
+    .inventory-drawer__panel .drawer-body{
+      display:flex;
+      flex-direction:column;
+      gap:var(--space);
+    }
+    @media (max-width:720px){
+      .inventory-drawer{
+        justify-content:center;
+        padding:clamp(12px, 4vw, 24px);
+      }
+      .inventory-drawer__panel{
+        width:min(520px, 100%);
+      }
+    }
+    @media (max-width:560px){
+      .inventory-drawer{
+        padding:0;
+      }
+      .inventory-drawer__panel{
+        border-radius:0;
+      }
+    }
     .hidden{display:none!important;}
     .mobile-actions{
       position:fixed;
@@ -551,70 +633,53 @@
       </div>
       <div class="stats">
         <span class="pill" id="invCount" aria-live="polite">0 ítems</span>
+        <span class="pill muted" id="keyIndicator" aria-live="polite">Clave: —</span>
       </div>
     </header>
 
     <div class="app-grid">
-      <aside class="sidebar" aria-label="Panel de control">
-        <section class="panel section stack" aria-label="Carga de inventario">
-          <div class="section-title">
-            <div class="stack">
-              <h2>Inventario</h2>
-              <p>Importá tu archivo CSV o Excel para habilitar coincidencias instantáneas.</p>
+      <section class="panel control-panel" aria-label="Panel principal">
+        <div class="control-grid">
+          <div class="control-block">
+            <div class="section-title">
+              <div class="stack">
+                <h2>Escáner</h2>
+                <p>Activá la cámara para detectar códigos al instante.</p>
+              </div>
+              <span class="chip" id="apiStatus">API: detectando…</span>
             </div>
-            <label class="button ghost" for="fileInput">Seleccionar</label>
-          </div>
-          <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
-          <div id="drop" class="file-drop" tabindex="0">Arrastrá y soltá el archivo aquí</div>
-          <div class="field-grid">
-            <div class="stack">
-              <label for="keySelect">Columna clave</label>
-              <select id="keySelect"></select>
-            </div>
-            <div class="stack">
-              <label for="filterInput">Filtro rápido</label>
-              <input id="filterInput" type="text" placeholder="Buscar en inventario" />
-            </div>
-          </div>
-          <div class="tip status" id="autoLoadMsg" aria-live="polite"></div>
-          <div class="tip">Sugerencia: para uso 100% offline, preferí CSV (el soporte Excel usa un script CDN).</div>
-        </section>
-
-        <section class="panel section stack" aria-label="Escáner de códigos">
-          <div class="section-title">
-            <div class="stack">
-              <h2>Escáner</h2>
-              <p>Activá la cámara o ingresá códigos manualmente.</p>
-            </div>
-            <span class="chip" id="apiStatus">API: detectando…</span>
-          </div>
-          <div class="row fit tight">
-            <button class="button primary" id="startBtn" type="button">Iniciar cámara</button>
-            <button class="button warn" id="stopBtn" type="button" disabled>Detener</button>
-            <button class="button" id="flashBtn" type="button" disabled>Flash</button>
-            <button class="button" id="switchBtn" type="button" disabled>Cambiar</button>
-          </div>
-          <div class="stack">
-            <label for="manualInput">Ingreso manual</label>
             <div class="row fit tight">
-              <input id="manualInput" type="text" placeholder="Pegá o escribí un código y Enter" />
+              <button class="button primary" id="startBtn" type="button">Iniciar cámara</button>
+              <button class="button warn" id="stopBtn" type="button" disabled>Detener</button>
+              <button class="button" id="flashBtn" type="button" disabled>Flash</button>
+              <button class="button" id="switchBtn" type="button" disabled>Cambiar</button>
+            </div>
+          </div>
+          <div class="control-block">
+            <h2>Ingreso manual</h2>
+            <p class="tip">Ideal para códigos únicos o cuando la cámara no está disponible.</p>
+            <div class="row fit tight">
+              <input id="manualInput" type="text" placeholder="Pegá o escribí un código y Enter" aria-label="Ingreso manual" />
               <button class="button" id="manualBtn" type="button">OK</button>
             </div>
             <div class="tip">Atajo: <span class="kbd">Enter</span> confirma. <span class="kbd">Ctrl/Cmd + C</span> conforma.</div>
           </div>
-          <div class="mobile-actions" role="group" aria-label="Acciones rápidas">
-            <button class="button primary" id="confirmBtnMobile" type="button" disabled>Conformar</button>
-            <button class="button" id="exportBtnMobile" type="button">Descargar CSV</button>
+          <div class="control-block">
+            <h2>Inventario y acciones</h2>
+            <p class="tip">Administrá el inventario importado y exportá los conformados.</p>
+            <button class="button ghost full" id="inventoryToggle" type="button" aria-controls="inventoryDrawer" aria-expanded="false">Administrar inventario</button>
+            <div class="row tight">
+              <button class="button primary" id="exportBtn" type="button">Descargar "conformado.csv"</button>
+              <button class="button danger" id="clearBtn" type="button">Limpiar conformados</button>
+            </div>
+            <div class="tip status" id="inventoryStatus" aria-live="polite">Preparado para importar un inventario.</div>
           </div>
-        </section>
-
-        <section class="panel section stack" aria-label="Acciones">
-          <div class="row tight">
-            <button class="button primary" id="exportBtn" type="button">Descargar "conformado.csv"</button>
-            <button class="button danger" id="clearBtn" type="button">Limpiar conformados</button>
-          </div>
-        </section>
-      </aside>
+        </div>
+        <div class="mobile-actions" role="group" aria-label="Acciones rápidas">
+          <button class="button primary" id="confirmBtnMobile" type="button" disabled>Conformar</button>
+          <button class="button" id="exportBtnMobile" type="button">Descargar CSV</button>
+        </div>
+      </section>
 
       <main class="workspace">
         <div class="panel video-wrap" aria-label="Visor de la cámara">
@@ -690,6 +755,35 @@
           </details>
         </section>
       </main>
+    </div>
+
+    <div id="inventoryDrawer" class="inventory-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="inventoryTitle" aria-hidden="true">
+      <div class="panel section stack inventory-drawer__panel">
+        <div class="drawer-header">
+          <div class="stack">
+            <h2 id="inventoryTitle">Inventario</h2>
+            <p class="subtitle">Importá tu archivo CSV o Excel para habilitar coincidencias instantáneas.</p>
+          </div>
+          <button class="button ghost" id="inventoryClose" type="button">Cerrar</button>
+        </div>
+        <div class="drawer-body">
+          <label class="button primary full" for="fileInput">Seleccionar archivo</label>
+          <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
+          <div id="drop" class="file-drop" tabindex="0">Arrastrá y soltá el archivo aquí</div>
+          <div class="field-grid">
+            <div class="stack">
+              <label for="keySelect">Columna clave</label>
+              <select id="keySelect"></select>
+            </div>
+            <div class="stack">
+              <label for="filterInput">Filtro rápido</label>
+              <input id="filterInput" type="text" placeholder="Buscar en inventario" />
+            </div>
+          </div>
+          <div class="tip status" id="autoLoadMsg" aria-live="polite">Preparado para importar un inventario.</div>
+          <div class="tip">Sugerencia: para uso 100% offline, preferí CSV (el soporte Excel usa un script CDN).</div>
+        </div>
+      </div>
     </div>
 
     <footer>Hecho con ❤️ para flujos rápidos en depósito y control.</footer>
@@ -787,6 +881,43 @@
     const parts = Array.from({length:120},()=>({x,y,vx:(Math.random()-0.5)*6,vy:(Math.random()*-6-3),w:2+Math.random()*3,h:6+Math.random()*6,rot:Math.random()*Math.PI,vr:(Math.random()-0.5)*.2,life:120+Math.random()*60, col:`hsl(${Math.random()*360},90%,70%)`}));
     let tick=0; (function loop(){ ctx.clearRect(0,0,c.width,c.height); parts.forEach(p=>{ p.vy+=.12; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr; p.life--; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.col; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); });
       if(++tick<180){ requestAnimationFrame(loop)} else c.remove(); })();
+  }
+
+  function updateInventoryIndicators(){
+    const inv = $('#invCount');
+    if(inv){
+      const total = state.inventory.length;
+      inv.textContent = `${total} ${total===1 ? 'ítem' : 'ítems'}`;
+      inv.title = state.inventoryName ? `Inventario: ${state.inventoryName}` : '';
+    }
+    const keyInfo = $('#keyIndicator');
+    if(keyInfo){
+      keyInfo.textContent = state.key ? `Clave: ${state.key}` : 'Clave: —';
+    }
+    const toggleBtn = $('#inventoryToggle');
+    if(toggleBtn){
+      toggleBtn.title = state.inventoryName ? `Inventario: ${state.inventoryName}` : 'Abrir panel de inventario';
+      toggleBtn.disabled = false;
+    }
+  }
+
+  function toggleInventoryDrawer(open){
+    const drawer = $('#inventoryDrawer');
+    if(!drawer) return;
+    const toggler = $('#inventoryToggle');
+    const closeBtn = $('#inventoryClose');
+    const shouldOpen = typeof open === 'boolean' ? open : drawer.classList.contains('hidden');
+    if(shouldOpen){
+      drawer.classList.remove('hidden');
+      drawer.setAttribute('aria-hidden','false');
+      toggler?.setAttribute('aria-expanded','true');
+      requestAnimationFrame(()=> closeBtn?.focus());
+    }else{
+      drawer.classList.add('hidden');
+      drawer.setAttribute('aria-hidden','true');
+      toggler?.setAttribute('aria-expanded','false');
+      toggler?.focus();
+    }
   }
 
   // ---- CSV Parser (ligero, con autodetección de separador) ----
@@ -893,13 +1024,17 @@
   }
 
   function setInventoryStatus(text='', tone='info'){
-    const msg = $('#autoLoadMsg');
-    if(!msg) return;
-    msg.textContent = text;
-    msg.classList.remove('success','error','warn');
-    if(tone==='success') msg.classList.add('success');
-    else if(tone==='error') msg.classList.add('error');
-    else if(tone==='warn') msg.classList.add('warn');
+    const targets = ['#autoLoadMsg', '#inventoryStatus'];
+    const classes = ['success','error','warn'];
+    targets.forEach(sel=>{
+      const msg = $(sel);
+      if(!msg) return;
+      msg.textContent = text;
+      msg.classList.remove(...classes);
+      if(tone==='success') msg.classList.add('success');
+      else if(tone==='error') msg.classList.add('error');
+      else if(tone==='warn') msg.classList.add('warn');
+    });
   }
 
   function hydrateInventory(rows, {name='inventario', delimiter}={}){
@@ -929,7 +1064,7 @@
     paintInventory();
     fillKeySelect();
     paintConformados();
-    $('#invCount').textContent = `${state.inventory.length} ítems`;
+    updateInventoryIndicators();
     setInventoryStatus(`Inventario cargado${name?` (${name})`:''}: ${state.inventory.length} ítems disponibles.`, 'success');
   }
 
@@ -943,6 +1078,7 @@
       const code = String(row[state.key] ?? '').trim();
       if(code) state.index.set(code, row);
     }
+    updateInventoryIndicators();
   }
 
   function fillKeySelect(){
@@ -1527,8 +1663,20 @@
   document.addEventListener('DOMContentLoaded', async ()=>{
     restoreConformados();
     await initDevices();
+    updateInventoryIndicators();
     setInventoryStatus('Buscando inventario predeterminado…', 'info');
     loadDefaultInventory();
+    const drawer = $('#inventoryDrawer');
+    $('#inventoryToggle').addEventListener('click', ()=> toggleInventoryDrawer());
+    $('#inventoryClose').addEventListener('click', ()=> toggleInventoryDrawer(false));
+    if(drawer){
+      drawer.addEventListener('click', (e)=>{ if(e.target===drawer) toggleInventoryDrawer(false); });
+    }
+    document.addEventListener('keydown', (e)=>{
+      if(e.key==='Escape' && !drawer?.classList.contains('hidden')){
+        toggleInventoryDrawer(false);
+      }
+    });
     $('#keySelect').addEventListener('change', e=>{ state.key = e.target.value; rebuildIndex(); });
     $('#filterInput').addEventListener('input', paintInventory);
 
@@ -1626,6 +1774,8 @@
       confetti,
       setChip,
       setScanLabel,
+      updateInventoryIndicators,
+      toggleInventoryDrawer,
       ensureZXing,
       ensureSheetJS,
       persistConformados,
