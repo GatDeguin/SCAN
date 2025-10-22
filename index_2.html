@@ -112,7 +112,8 @@
       </div>
     </main>
 
-    <script src="https://unpkg.com/@zxing/browser@0.1.4/umd/index.min.js"></script>
+    <!-- Librería ZXing incluida localmente para evitar bloqueos del CDN -->
+    <script src="./vendor/zxing-browser-0.1.4.min.js"></script>
     <script>
       const startButton = document.getElementById('start');
       const stopButton = document.getElementById('stop');
@@ -120,13 +121,24 @@
       const outputElement = document.getElementById('output');
       const statusBox = document.getElementById('status');
 
-      const reader = new ZXingBrowser.BrowserMultiFormatReader();
-      let controls;
-
       function setStatus(text, isError = false) {
         outputElement.textContent = text;
         statusBox.classList.toggle('error', isError);
       }
+
+      const ZXingBrowser = window.ZXingBrowser;
+
+      if (!ZXingBrowser) {
+        console.error('No se pudo cargar la librería ZXing.');
+        setStatus('No fue posible cargar el lector de códigos.', true);
+        startButton.disabled = true;
+        stopButton.disabled = true;
+        throw new Error('ZXingBrowser library failed to load.');
+      }
+
+      const { BrowserMultiFormatReader, BrowserCodeReader, NotFoundException } = ZXingBrowser;
+      const reader = new BrowserMultiFormatReader();
+      let controls;
 
       async function startScanner() {
         startButton.disabled = true;
@@ -134,7 +146,7 @@
         setStatus('Activando cámara…');
 
         try {
-          const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+          const devices = await BrowserCodeReader.listVideoInputDevices();
 
           if (!devices.length) {
             throw new Error('No se encontraron cámaras disponibles.');
@@ -148,7 +160,7 @@
             (result, error) => {
               if (result) {
                 setStatus(result.getText());
-              } else if (error && !(error instanceof ZXingBrowser.NotFoundException)) {
+              } else if (error && !(error instanceof NotFoundException)) {
                 console.error(error);
                 setStatus('Error al procesar el código.', true);
               }
