@@ -74,6 +74,12 @@
     @media (min-width:680px){ .grid{grid-template-columns: repeat(2, 1fr)} }
 
     .video-wrap{position:relative; width:100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow:hidden; background: #0a0f24; border:1px solid rgba(255,255,255,.06)}
+    .scan-action{position:absolute; top:12px; right:12px; display:flex; z-index:2}
+    .button.scan-trigger{background: rgba(16,23,54,.78); border-color: rgba(255,255,255,.18); backdrop-filter: blur(8px)}
+    .button.scan-trigger:disabled{opacity:.6; cursor:not-allowed}
+    @media (max-width:640px){
+      .scan-action{top:10px; right:10px}
+    }
     @media (min-width: 1200px){ .video-wrap{aspect-ratio: 21 / 9} }
     video{width:100%; height:100%; object-fit:cover; filter: saturate(1.08) contrast(1.05)}
     .scan-status{position:absolute; left:12px; bottom:12px; display:flex; gap:8px; align-items:center}
@@ -195,6 +201,9 @@
       <!-- Video/Scanner Panel -->
       <div class="panel video-wrap">
         <video id="video" playsinline muted></video>
+        <div class="scan-action">
+          <button class="button scan-trigger" id="scanOnceBtn" type="button" disabled>Ejecutar lectura</button>
+        </div>
         <div class="scan-status">
           <div id="pulse" class="pulse" aria-hidden="true"></div>
           <span id="scanLabel" class="pill">Cámara inactiva</span>
@@ -286,16 +295,34 @@
     exportDelimiter: ';',
   };
 
+  const BARCODE_FORMATS = ['code_128','ean_13','ean_8','upc_a','upc_e','code_39','code_93','itf','codabar','qr_code','data_matrix','pdf417'];
+
   // ---- Utilidades UI ----
   const $ = sel => document.querySelector(sel);
   const el = (tag, attrs={},{children=[]}={}) => { const n = document.createElement(tag); Object.entries(attrs).forEach(([k,v])=>{ if(k==="class") n.className=v; else if(k==="text") n.textContent=v; else n.setAttribute(k,v)}); children.forEach(c=> n.appendChild(c)); return n};
   const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+  let scanLabelTimer = null;
+  let manualScanBusy = false;
 
   function setChip(id, text, ok=null){
     const chip = $(id); chip.textContent = text;
     chip.classList.remove('ok','bad');
     if(ok===true) chip.classList.add('ok');
     if(ok===false) chip.classList.add('bad');
+  }
+
+  function setScanLabel(text, revertMs=null){
+    const label = $('#scanLabel');
+    if(!label) return;
+    label.textContent = text;
+    if(scanLabelTimer){ clearTimeout(scanLabelTimer); scanLabelTimer = null; }
+    if(revertMs!==null){
+      scanLabelTimer = setTimeout(()=>{
+        scanLabelTimer = null;
+        if(state.scanning){ label.textContent = 'Escaneando…'; }
+      }, revertMs);
+    }
   }
 
   function confetti(x=window.innerWidth/2,y=window.innerHeight/2){
@@ -518,7 +545,8 @@
       const v = $('#video'); v.srcObject = stream; await v.play();
       const track = stream.getVideoTracks?.()[0];
       state.currentDeviceId = track?.getSettings?.().deviceId || state.currentDeviceId;
-      $('#pulse').classList.add('on'); $('#scanLabel').textContent = 'Escaneando…';
+      $('#pulse').classList.add('on');
+      setScanLabel('Escaneando…');
       $('#startBtn').disabled = true; $('#stopBtn').disabled = false;
       $('#flashBtn').textContent = 'Flash';
       state.torchOn = false;
@@ -529,6 +557,12 @@
       }
       $('#flashBtn').disabled = !torchAvailable;
       state.scanning = true;
+      manualScanBusy = false;
+      const scanBtn = $('#scanOnceBtn');
+      if(scanBtn){
+        scanBtn.disabled = false;
+        scanBtn.textContent = 'Ejecutar lectura';
+      }
       state.detector = null;
       if(state.fallbackReader?.reset) state.fallbackReader.reset();
       state.fallbackReader = null;
@@ -564,11 +598,18 @@
     const v = $('#video');
     const s = v.srcObject;
     if(s){ s.getTracks().forEach(t=>t.stop()); v.srcObject=null; }
-    $('#pulse').classList.remove('on'); $('#scanLabel').textContent = 'Cámara inactiva';
+    state.scanning = false;
+    manualScanBusy = false;
+    $('#pulse').classList.remove('on');
+    setScanLabel('Cámara inactiva');
     $('#startBtn').disabled = false; $('#stopBtn').disabled = true;
     $('#flashBtn').disabled = true; $('#flashBtn').textContent = 'Flash';
     state.torchOn = false;
-    state.scanning = false;
+    const scanBtn = $('#scanOnceBtn');
+    if(scanBtn){
+      scanBtn.disabled = true;
+      scanBtn.textContent = 'Ejecutar lectura';
+    }
     state.detector = null;
     if(state.fallbackReader?.reset) state.fallbackReader.reset();
     state.fallbackReader = null;
@@ -617,8 +658,7 @@
         }
       } else if('BarcodeDetector' in window && !state.fallbackReader){
         try{
-          const formats = ['code_128','ean_13','ean_8','upc_a','upc_e','code_39','code_93','itf','codabar','qr_code','data_matrix','pdf417'];
-          state.detector = new BarcodeDetector({formats});
+          state.detector = new BarcodeDetector({formats: BARCODE_FORMATS});
           setChip('#apiStatus','API: BarcodeDetector', true);
           _lastDetectTs = 0;
         }catch(err){
@@ -676,6 +716,125 @@
       console.warn('detectLoop error', err);
     }
     requestAnimationFrame(detectLoop);
+  }
+
+  async function scanOnce(){
+    if(manualScanBusy) return;
+    if(!state.scanning){
+      alert('Iniciá la cámara para ejecutar una lectura.');
+      return;
+    }
+    const video = $('#video');
+    const btn = $('#scanOnceBtn');
+    if(!video?.srcObject){
+      alert('No hay una cámara activa. Iniciá la cámara.');
+      return;
+    }
+    manualScanBusy = true;
+    const prevText = btn?.textContent || '';
+    if(btn){
+      btn.disabled = true;
+      btn.textContent = 'Leyendo…';
+    }
+    setScanLabel('Buscando código…');
+    let detected = false;
+    try{
+      if(video.readyState < 2){
+        await sleep(120);
+      }
+      if('BarcodeDetector' in window && !state.fallbackReader){
+        if(!state.detector){
+          try{
+            state.detector = new BarcodeDetector({formats: BARCODE_FORMATS});
+            setChip('#apiStatus','API: BarcodeDetector', true);
+            _lastDetectTs = 0;
+          }catch(err){
+            console.warn('BarcodeDetector no disponible, usando ZXing', err);
+            state.detector = null;
+          }
+        }
+        if(state.detector){
+          let bitmap;
+          try{
+            bitmap = await createImageBitmap(video);
+            const codes = await state.detector.detect(bitmap);
+            const first = codes?.[0];
+            const value = first?.rawValue || first?.displayValue || '';
+            if(value){
+              detected = true;
+              onDetect(value);
+            }
+          }finally{
+            bitmap?.close?.();
+          }
+        }
+      }
+      if(!detected){
+        if(!state.fallbackReader){
+          const ZX = await ensureZXing();
+          if(ZX && ZX.BrowserMultiFormatReader){
+            state.fallbackReader = new ZX.BrowserMultiFormatReader();
+            if('timeBetweenDecodingAttempts' in state.fallbackReader){
+              state.fallbackReader.timeBetweenDecodingAttempts = DETECT_EVERY_MS;
+            }
+            if('timeBetweenScansMillis' in state.fallbackReader){
+              state.fallbackReader.timeBetweenScansMillis = DETECT_EVERY_MS;
+            }
+            if(!('BarcodeDetector' in window) || !state.detector){
+              setChip('#apiStatus','API: ZXing (fallback)', true);
+            }
+            state.fallbackErrorShown = false;
+          } else {
+            setChip('#apiStatus','API: no disponible (sin ZXing)', false);
+            if(!state.fallbackErrorShown){
+              alert('Este navegador no soporta BarcodeDetector y no se pudo cargar la librería ZXing. Usá el ingreso manual.');
+              state.fallbackErrorShown = true;
+            }
+          }
+        }
+        if(state.fallbackReader){
+          try{
+            const result = await state.fallbackReader.decodeFromVideoElement(video);
+            const text = result?.text || result?.getText?.();
+            if(text){
+              detected = true;
+              onDetect(text);
+            }
+          }catch(err){
+            const ZX = window.ZXing;
+            const name = err?.name;
+            if(ZX && (err instanceof ZX.NotFoundException || err instanceof ZX.ChecksumException || err instanceof ZX.FormatException)){
+              // Errores esperados cuando no hay código en el frame
+            } else if(name && ['NotFoundException','ChecksumException','FormatException'].includes(name)){
+              // Errores esperados sin ZXing global disponible
+            } else if(err?.message?.includes('No MultiFormat Readers were able to detect')){
+              // ZXing no encontró código en este frame
+            } else {
+              console.warn('Error detectando con ZXing (manual)', err);
+            }
+          }
+        }
+      }
+      if(detected){
+        setScanLabel('Código detectado', 1800);
+      } else {
+        setScanLabel('Sin resultados', 1800);
+      }
+    }catch(err){
+      console.warn('scanOnce error', err);
+      setScanLabel('Error en lectura', 2000);
+    }finally{
+      if(state.scanning){
+        _lastDetectTs = performance.now();
+      }
+      if(btn){
+        btn.textContent = prevText || 'Ejecutar lectura';
+        if(state.scanning){
+          btn.disabled = false;
+        }
+      }
+      manualScanBusy = false;
+    }
   }
 
   function onDetect(code){
@@ -831,6 +990,7 @@
     $('#stopBtn').addEventListener('click', stopCamera);
     $('#flashBtn').addEventListener('click', toggleTorch);
     $('#switchBtn').addEventListener('click', switchCamera);
+    $('#scanOnceBtn').addEventListener('click', scanOnce);
 
     // Manual input
     const manual = ()=>{ const v = $('#manualInput').value.trim(); if(!v) return; onDetect(v); $('#manualInput').value=''; };
