@@ -715,6 +715,28 @@
   };
 
   const BARCODE_FORMATS = ['code_128','ean_13','ean_8','upc_a','upc_e','code_39','code_93','itf','codabar','qr_code','data_matrix','pdf417'];
+  const ZXING_FORMAT_MAP = {
+    code_128: 'CODE_128',
+    ean_13: 'EAN_13',
+    ean_8: 'EAN_8',
+    upc_a: 'UPC_A',
+    upc_e: 'UPC_E',
+    code_39: 'CODE_39',
+    code_93: 'CODE_93',
+    itf: 'ITF',
+    codabar: 'CODABAR',
+    qr_code: 'QR_CODE',
+    data_matrix: 'DATA_MATRIX',
+    pdf417: 'PDF_417',
+  };
+
+  let barcodeDetectorFormatsCache = null;
+  let barcodeDetectorFormatsPromise = null;
+  let barcodeDetectorAvailable = null;
+  let barcodeDetectorSupportsVideo = null;
+  let barcodeDetectorSupportsBitmap = null;
+  let detectionCanvas = null;
+  let detectionCanvasCtx = null;
 
   // ---- Utilidades UI ----
   const $ = sel => document.querySelector(sel);
@@ -996,31 +1018,17 @@
         scanBtn.disabled = false;
         scanBtn.textContent = 'Ejecutar lectura';
       }
-      state.detector = null;
       if(state.fallbackReader?.reset) state.fallbackReader.reset();
-      state.fallbackReader = null;
+      state.detector = null;
       state.fallbackErrorShown = false;
+      detectionCanvas = null;
+      detectionCanvasCtx = null;
       _lastDetectTs = 0;
-      if(!('BarcodeDetector' in window)){
-        const ZX = await ensureZXing();
-        if(ZX && ZX.BrowserMultiFormatReader){
-          state.fallbackReader = new ZX.BrowserMultiFormatReader();
-          if('timeBetweenDecodingAttempts' in state.fallbackReader){
-            state.fallbackReader.timeBetweenDecodingAttempts = DETECT_EVERY_MS;
-          }
-          if('timeBetweenScansMillis' in state.fallbackReader){
-            state.fallbackReader.timeBetweenScansMillis = DETECT_EVERY_MS;
-          }
-          setChip('#apiStatus','API: ZXing (fallback)', true);
-        } else {
-          setChip('#apiStatus','API: no disponible (sin ZXing)', false);
-          if(!state.fallbackErrorShown){
-            alert('Este navegador no soporta BarcodeDetector y no se pudo cargar la librería ZXing. Usá el ingreso manual.');
-            state.fallbackErrorShown = true;
-          }
-          stopCamera();
-          return;
-        }
+      const engine = await ensureDetectionEngine();
+      if(!engine){
+        handleNoDetectionAvailable();
+        stopCamera();
+        return;
       }
       await initDevices();
       detectLoop();
@@ -1046,6 +1054,8 @@
     state.detector = null;
     if(state.fallbackReader?.reset) state.fallbackReader.reset();
     state.fallbackReader = null;
+    detectionCanvas = null;
+    detectionCanvasCtx = null;
   }
 
   async function toggleTorch(){
@@ -1064,6 +1074,252 @@
     state.currentDeviceId = next.deviceId; stopCamera(); startCamera();
   }
 
+  function isVideoReady(video){
+    return !!(video && video.readyState >= 2 && video.videoWidth && video.videoHeight);
+  }
+
+  async function getSupportedBarcodeFormats(){
+    if(!('BarcodeDetector' in window)) return [];
+    if(barcodeDetectorFormatsCache) return barcodeDetectorFormatsCache;
+    if(!barcodeDetectorFormatsPromise){
+      barcodeDetectorFormatsPromise = (async ()=>{
+        if(typeof BarcodeDetector.getSupportedFormats === 'function'){
+          try{
+            const supported = await BarcodeDetector.getSupportedFormats();
+            if(Array.isArray(supported) && supported.length){
+              const filtered = BARCODE_FORMATS.filter(f=> supported.includes(f));
+              return filtered.length ? filtered : supported;
+            }
+          }catch(err){
+            console.warn('No se pudieron obtener los formatos soportados por BarcodeDetector', err);
+          }
+        }
+        return BARCODE_FORMATS.slice();
+      })()
+      .then(list=>{
+        barcodeDetectorFormatsCache = Array.isArray(list) ? list : BARCODE_FORMATS.slice();
+        return barcodeDetectorFormatsCache;
+      })
+      .catch(err=>{
+        console.warn('Fallo resolviendo formatos para BarcodeDetector', err);
+        barcodeDetectorFormatsCache = [];
+        return barcodeDetectorFormatsCache;
+      });
+    }
+    await barcodeDetectorFormatsPromise;
+    return barcodeDetectorFormatsCache;
+  }
+
+  async function ensureBarcodeDetector(){
+    if(barcodeDetectorAvailable === false) return null;
+    if(!('BarcodeDetector' in window)){
+      barcodeDetectorAvailable = false;
+      return null;
+    }
+    if(state.detector) return state.detector;
+    try{
+      const formats = await getSupportedBarcodeFormats();
+      state.detector = formats && formats.length
+        ? new BarcodeDetector({ formats })
+        : new BarcodeDetector();
+      barcodeDetectorAvailable = true;
+      setChip('#apiStatus','API: BarcodeDetector', true);
+      state.fallbackErrorShown = false;
+      return state.detector;
+    }catch(err){
+      barcodeDetectorAvailable = false;
+      state.detector = null;
+      console.warn('BarcodeDetector no disponible, usando ZXing', err);
+      return null;
+    }
+  }
+
+  function captureCanvasFrame(video){
+    if(!isVideoReady(video)) return null;
+    if(!detectionCanvas){
+      detectionCanvas = document.createElement('canvas');
+      detectionCanvasCtx = detectionCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    if(!detectionCanvasCtx) return null;
+    if(detectionCanvas.width !== video.videoWidth || detectionCanvas.height !== video.videoHeight){
+      detectionCanvas.width = video.videoWidth;
+      detectionCanvas.height = video.videoHeight;
+    }
+    detectionCanvasCtx.drawImage(video, 0, 0, detectionCanvas.width, detectionCanvas.height);
+    return detectionCanvas;
+  }
+
+  function configureZXingReader(reader, ZX){
+    if(!reader || !ZX || !ZX.DecodeHintType || !ZX.BarcodeFormat || typeof reader.setHints !== 'function') return;
+    try{
+      const hints = new Map();
+      const formats = [];
+      for(const key of BARCODE_FORMATS){
+        const mapped = ZXING_FORMAT_MAP[key];
+        if(mapped && ZX.BarcodeFormat[mapped]){
+          formats.push(ZX.BarcodeFormat[mapped]);
+        }
+      }
+      if(formats.length){
+        hints.set(ZX.DecodeHintType.POSSIBLE_FORMATS, formats);
+      }
+      if(ZX.DecodeHintType.TRY_HARDER){
+        hints.set(ZX.DecodeHintType.TRY_HARDER, true);
+      }
+      reader.setHints(hints);
+    }catch(err){
+      console.warn('No se pudieron configurar los hints para ZXing', err);
+    }
+  }
+
+  async function ensureFallbackReader(){
+    if(state.fallbackReader) return state.fallbackReader;
+    const ZX = await ensureZXing();
+    if(!ZX || !ZX.BrowserMultiFormatReader) return null;
+    const reader = new ZX.BrowserMultiFormatReader();
+    if('timeBetweenDecodingAttempts' in reader){
+      reader.timeBetweenDecodingAttempts = DETECT_EVERY_MS;
+    }
+    if('timeBetweenScansMillis' in reader){
+      reader.timeBetweenScansMillis = DETECT_EVERY_MS;
+    }
+    configureZXingReader(reader, ZX);
+    state.fallbackReader = reader;
+    setChip('#apiStatus','API: ZXing (fallback)', true);
+    state.fallbackErrorShown = false;
+    return state.fallbackReader;
+  }
+
+  function handleNoDetectionAvailable(){
+    setChip('#apiStatus','API: no disponible (sin ZXing)', false);
+    if(!state.fallbackErrorShown){
+      alert('Este navegador no soporta BarcodeDetector y no se pudo cargar la librería ZXing. Usá el ingreso manual.');
+      state.fallbackErrorShown = true;
+    }
+  }
+
+  async function ensureDetectionEngine(){
+    const detector = await ensureBarcodeDetector();
+    if(detector) return 'detector';
+    const fallback = await ensureFallbackReader();
+    if(fallback) return 'fallback';
+    return null;
+  }
+
+  async function detectWithNative(detector, video){
+    if(!detector || !isVideoReady(video)) return null;
+    const attempts = [];
+    if(barcodeDetectorSupportsVideo !== false){
+      attempts.push(async ()=>({ kind:'video', source: video }));
+    }
+    if(typeof window.createImageBitmap === 'function' && barcodeDetectorSupportsBitmap !== false){
+      attempts.push(async ()=>{
+        const bitmap = await window.createImageBitmap(video);
+        return { kind:'bitmap', source: bitmap, cleanup: ()=> bitmap.close() };
+      });
+    }
+    attempts.push(async ()=>{
+      const canvas = captureCanvasFrame(video);
+      return canvas ? { kind:'canvas', source: canvas } : null;
+    });
+
+    for(const attempt of attempts){
+      let payload = null;
+      try{
+        payload = await attempt();
+        if(!payload || !payload.source) continue;
+        const codes = await detector.detect(payload.source);
+        if(codes && codes.length){
+          const first = codes[0];
+          const value = first?.rawValue || first?.displayValue || '';
+          if(value){
+            payload.cleanup?.();
+            return value;
+          }
+        }
+      }catch(err){
+        if(payload?.kind === 'video'){
+          barcodeDetectorSupportsVideo = false;
+          if(err?.name !== 'TypeError'){
+            console.warn('Error detectando con BarcodeDetector (video)', err);
+          }
+        } else if(payload?.kind === 'bitmap'){
+          barcodeDetectorSupportsBitmap = false;
+          console.warn('Error generando ImageBitmap para BarcodeDetector', err);
+        } else {
+          console.warn('Error detectando con BarcodeDetector', err);
+        }
+      }finally{
+        try{ payload?.cleanup?.(); }catch{}
+      }
+    }
+    return null;
+  }
+
+  function isZXingExpectedError(err, ZX){
+    if(!err) return true;
+    if(err?.message === 'ZXING_TIMEOUT') return true;
+    const name = err?.name;
+    if(ZX && (err instanceof ZX.NotFoundException || err instanceof ZX.ChecksumException || err instanceof ZX.FormatException)){
+      return true;
+    }
+    if(name && ['NotFoundException','ChecksumException','FormatException'].includes(name)){
+      return true;
+    }
+    if(err?.message?.includes('No MultiFormat Readers were able to detect')){
+      return true;
+    }
+    return false;
+  }
+
+  async function detectWithZXing(reader, video, {manual=false}={}){
+    if(!reader || !isVideoReady(video)) return null;
+    const ZX = window.ZXing;
+    try{
+      if(manual){
+        const result = await Promise.race([
+          reader.decodeFromVideoElement(video),
+          new Promise((_, reject)=> setTimeout(()=> reject(new Error('ZXING_TIMEOUT')), ZXING_MANUAL_TIMEOUT_MS)),
+        ]);
+        const text = result?.text || result?.getText?.();
+        return text || null;
+      }
+      const result = await reader.decodeFromVideoElement(video);
+      const text = result?.text || result?.getText?.();
+      return text || null;
+    }catch(err){
+      if(!isZXingExpectedError(err, ZX)){
+        console.warn(`Error detectando con ZXing${manual ? ' (manual)' : ''}`, err);
+      }
+      return null;
+    }finally{
+      if(manual){
+        try{ reader.reset?.(); }catch{}
+      }
+    }
+  }
+
+  async function runDetection(video, {manual=false}={}){
+    let detector = await ensureBarcodeDetector();
+    if(detector){
+      const native = await detectWithNative(detector, video);
+      if(native){
+        return { text: native, engine: 'detector' };
+      }
+    }
+    const fallback = await ensureFallbackReader();
+    if(fallback){
+      const zx = await detectWithZXing(fallback, video, {manual});
+      if(zx){
+        return { text: zx, engine: 'fallback' };
+      }
+    }
+    if(!detector && !fallback){
+      handleNoDetectionAvailable();
+    }
+    return null;
+  }
+
   // Throttle de detección para mejorar rendimiento en móvil
   let _lastDetectTs = 0;
   const DETECT_EVERY_MS = 250;
@@ -1074,77 +1330,18 @@
     try{
       const video = $('#video');
       const now = performance.now();
-
-      if(state.detector){
-        if((now - _lastDetectTs) > DETECT_EVERY_MS && video.readyState >= 2){
-          _lastDetectTs = now;
-          try{
-            const bitmap = await createImageBitmap(video);
-            const codes = await state.detector.detect(bitmap);
-            bitmap.close?.();
-            if(codes && codes.length && state.scanning){
-              const first = codes[0];
-              onDetect(first.rawValue || first.displayValue);
-            }
-          }catch(err){
-            console.warn('Error detectando con BarcodeDetector', err);
-          }
-        }
-      } else if('BarcodeDetector' in window && !state.fallbackReader){
-        try{
-          state.detector = new BarcodeDetector({formats: BARCODE_FORMATS});
-          setChip('#apiStatus','API: BarcodeDetector', true);
-          _lastDetectTs = 0;
-        }catch(err){
-          console.warn('BarcodeDetector no disponible, usando ZXing', err);
-          state.detector = null;
-        }
+      if(!isVideoReady(video)){
+        requestAnimationFrame(detectLoop);
+        return;
       }
-
-      if(!state.detector){
-        if(!state.fallbackReader){
-          const ZX = await ensureZXing();
-          if(ZX && ZX.BrowserMultiFormatReader){
-            state.fallbackReader = new ZX.BrowserMultiFormatReader();
-            if('timeBetweenDecodingAttempts' in state.fallbackReader){
-              state.fallbackReader.timeBetweenDecodingAttempts = DETECT_EVERY_MS;
-            }
-            if('timeBetweenScansMillis' in state.fallbackReader){
-              state.fallbackReader.timeBetweenScansMillis = DETECT_EVERY_MS;
-            }
-            setChip('#apiStatus','API: ZXing (fallback)', true);
-            state.fallbackErrorShown = false;
-            _lastDetectTs = 0;
-          } else {
-            setChip('#apiStatus','API: no disponible (sin ZXing)', false);
-            if(!state.fallbackErrorShown){
-              alert('Este navegador no soporta BarcodeDetector y no se pudo cargar la librería ZXing. Usá el ingreso manual.');
-              state.fallbackErrorShown = true;
-            }
-            stopCamera();
-            return;
-          }
-        }
-        if(state.fallbackReader && (now - _lastDetectTs) > DETECT_EVERY_MS && video.readyState >= 2){
-          _lastDetectTs = now;
-          try{
-            const result = await state.fallbackReader.decodeFromVideoElement(video);
-            const text = result?.text || result?.getText?.();
-            if(text && state.scanning){ onDetect(text); }
-          }catch(err){
-            const ZX = window.ZXing;
-            const name = err?.name;
-            if(ZX && (err instanceof ZX.NotFoundException || err instanceof ZX.ChecksumException || err instanceof ZX.FormatException)){
-              // Errores esperados cuando no hay código en el frame
-            } else if(name && ['NotFoundException','ChecksumException','FormatException'].includes(name)){
-              // Errores esperados sin ZXing global disponible
-            } else if(err?.message?.includes('No MultiFormat Readers were able to detect')){
-              // ZXing no encontró código en este frame
-            } else {
-              console.warn('Error detectando con ZXing', err);
-            }
-          }
-        }
+      if((now - _lastDetectTs) < DETECT_EVERY_MS){
+        requestAnimationFrame(detectLoop);
+        return;
+      }
+      const result = await runDetection(video);
+      _lastDetectTs = performance.now();
+      if(result?.text && state.scanning){
+        onDetect(result.text);
       }
     }catch(err){
       console.warn('detectLoop error', err);
@@ -1173,96 +1370,17 @@
     setScanLabel('Buscando código…');
     let detected = false;
     try{
-      if(video.readyState < 2){
+      if(!isVideoReady(video)){
         await sleep(120);
       }
-      if('BarcodeDetector' in window && !state.fallbackReader){
-        if(!state.detector){
-          try{
-            state.detector = new BarcodeDetector({formats: BARCODE_FORMATS});
-            setChip('#apiStatus','API: BarcodeDetector', true);
-            _lastDetectTs = 0;
-          }catch(err){
-            console.warn('BarcodeDetector no disponible, usando ZXing', err);
-            state.detector = null;
-          }
-        }
-        if(state.detector){
-          let bitmap;
-          try{
-            bitmap = await createImageBitmap(video);
-            const codes = await state.detector.detect(bitmap);
-            const first = codes?.[0];
-            const value = first?.rawValue || first?.displayValue || '';
-            if(value){
-              detected = true;
-              onDetect(value);
-            }
-          }finally{
-            bitmap?.close?.();
-          }
+      if(isVideoReady(video)){
+        const result = await runDetection(video, {manual:true});
+        if(result?.text){
+          detected = true;
+          onDetect(result.text);
         }
       }
-      if(!detected){
-        if(!state.fallbackReader){
-          const ZX = await ensureZXing();
-          if(ZX && ZX.BrowserMultiFormatReader){
-            state.fallbackReader = new ZX.BrowserMultiFormatReader();
-            if('timeBetweenDecodingAttempts' in state.fallbackReader){
-              state.fallbackReader.timeBetweenDecodingAttempts = DETECT_EVERY_MS;
-            }
-            if('timeBetweenScansMillis' in state.fallbackReader){
-              state.fallbackReader.timeBetweenScansMillis = DETECT_EVERY_MS;
-            }
-            if(!('BarcodeDetector' in window) || !state.detector){
-              setChip('#apiStatus','API: ZXing (fallback)', true);
-            }
-            state.fallbackErrorShown = false;
-          } else {
-            setChip('#apiStatus','API: no disponible (sin ZXing)', false);
-            if(!state.fallbackErrorShown){
-              alert('Este navegador no soporta BarcodeDetector y no se pudo cargar la librería ZXing. Usá el ingreso manual.');
-              state.fallbackErrorShown = true;
-            }
-          }
-        }
-        if(state.fallbackReader){
-          const ZX = window.ZXing;
-          try{
-            const result = await Promise.race([
-              state.fallbackReader.decodeFromVideoElement(video),
-              new Promise((_, reject)=> setTimeout(()=> reject(new Error('ZXING_TIMEOUT')), ZXING_MANUAL_TIMEOUT_MS))
-            ]);
-            const text = result?.text || result?.getText?.();
-            if(text){
-              detected = true;
-              onDetect(text);
-            }
-          }catch(err){
-            if(err?.message === 'ZXING_TIMEOUT'){
-              // Sin código detectado dentro del tiempo límite
-            } else {
-              const name = err?.name;
-              if(ZX && (err instanceof ZX.NotFoundException || err instanceof ZX.ChecksumException || err instanceof ZX.FormatException)){
-                // Errores esperados cuando no hay código en el frame
-              } else if(name && ['NotFoundException','ChecksumException','FormatException'].includes(name)){
-                // Errores esperados sin ZXing global disponible
-              } else if(err?.message?.includes('No MultiFormat Readers were able to detect')){
-                // ZXing no encontró código en este frame
-              } else {
-                console.warn('Error detectando con ZXing (manual)', err);
-              }
-            }
-          }finally{
-            try{ state.fallbackReader.reset?.(); }catch{}
-          }
-        }
-      }
-      if(detected){
-        setScanLabel('Código detectado', 1800);
-      } else {
-        setScanLabel('Sin resultados', 1800);
-      }
+      setScanLabel(detected ? 'Código detectado' : 'Sin resultados', 1800);
     }catch(err){
       console.warn('scanOnce error', err);
       setScanLabel('Error en lectura', 2000);
