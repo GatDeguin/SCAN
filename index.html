@@ -648,6 +648,7 @@
   // Throttle de detección para mejorar rendimiento en móvil
   let _lastDetectTs = 0;
   const DETECT_EVERY_MS = 250;
+  const ZXING_MANUAL_TIMEOUT_MS = 1500;
 
   async function detectLoop(){
     if(!state.scanning) return;
@@ -807,25 +808,34 @@
           }
         }
         if(state.fallbackReader){
+          const ZX = window.ZXing;
           try{
-            const result = await state.fallbackReader.decodeFromVideoElement(video);
+            const result = await Promise.race([
+              state.fallbackReader.decodeFromVideoElement(video),
+              new Promise((_, reject)=> setTimeout(()=> reject(new Error('ZXING_TIMEOUT')), ZXING_MANUAL_TIMEOUT_MS))
+            ]);
             const text = result?.text || result?.getText?.();
             if(text){
               detected = true;
               onDetect(text);
             }
           }catch(err){
-            const ZX = window.ZXing;
-            const name = err?.name;
-            if(ZX && (err instanceof ZX.NotFoundException || err instanceof ZX.ChecksumException || err instanceof ZX.FormatException)){
-              // Errores esperados cuando no hay código en el frame
-            } else if(name && ['NotFoundException','ChecksumException','FormatException'].includes(name)){
-              // Errores esperados sin ZXing global disponible
-            } else if(err?.message?.includes('No MultiFormat Readers were able to detect')){
-              // ZXing no encontró código en este frame
+            if(err?.message === 'ZXING_TIMEOUT'){
+              // Sin código detectado dentro del tiempo límite
             } else {
-              console.warn('Error detectando con ZXing (manual)', err);
+              const name = err?.name;
+              if(ZX && (err instanceof ZX.NotFoundException || err instanceof ZX.ChecksumException || err instanceof ZX.FormatException)){
+                // Errores esperados cuando no hay código en el frame
+              } else if(name && ['NotFoundException','ChecksumException','FormatException'].includes(name)){
+                // Errores esperados sin ZXing global disponible
+              } else if(err?.message?.includes('No MultiFormat Readers were able to detect')){
+                // ZXing no encontró código en este frame
+              } else {
+                console.warn('Error detectando con ZXing (manual)', err);
+              }
             }
+          }finally{
+            try{ state.fallbackReader.reset?.(); }catch{}
           }
         }
       }
