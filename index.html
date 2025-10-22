@@ -302,6 +302,20 @@
   const el = (tag, attrs={},{children=[]}={}) => { const n = document.createElement(tag); Object.entries(attrs).forEach(([k,v])=>{ if(k==="class") n.className=v; else if(k==="text") n.textContent=v; else n.setAttribute(k,v)}); children.forEach(c=> n.appendChild(c)); return n};
   const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
+  // Evita el warning de ZXing "Trying to play video that is already playing"
+  // devolviendo un resolved Promise cuando el video ya está en reproducción.
+  if(typeof HTMLMediaElement !== 'undefined' && !HTMLMediaElement.prototype.play.__scanGuarded){
+    const originalPlay = HTMLMediaElement.prototype.play;
+    const guardedPlay = function(...args){
+      if(this && typeof this.paused === 'boolean' && !this.paused){
+        return typeof Promise !== 'undefined' ? Promise.resolve() : undefined;
+      }
+      return originalPlay.apply(this, args);
+    };
+    guardedPlay.__scanGuarded = true;
+    HTMLMediaElement.prototype.play = guardedPlay;
+  }
+
   let scanLabelTimer = null;
   let manualScanBusy = false;
 
