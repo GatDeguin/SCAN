@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini App Inventario · Escáner + CSV/XLSX</title>
+  <style>
+    /* =========================
+       Diseño responsive, mobile‑first
+       ========================= */
+    :root{
+      --bg: #0b1020;
+      --panel: #101736;
+      --muted: #8a96b9;
+      --text: #f2f5ff;
+      --brand: #7cf2d3;
+      --accent: #9aa8ff;
+      --danger: #ff6b6b;
+      --warn: #ffbf69;
+      --ok: #38d996;
+      --card: #0f142a;
+      --shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+      --radius: 16px;
+      --space: clamp(10px, 2.2vw, 18px);
+      --text-sm: clamp(12px, 1.4vw, 13px);
+      --text-md: clamp(14px, 1.6vw, 15px);
+      --text-lg: clamp(16px, 2vw, 18px);
+      --text-xl: clamp(18px, 3vw, 22px);
+    }
+    html,body{height:100%}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 20% -10%, #1d2450 0%, transparent 50%),
+                  radial-gradient(1200px 600px at 120% 10%, #17324a 0%, transparent 45%),
+                  var(--bg);
+    }
+
+    /* Layout principal: grid fluido */
+    .app{display:grid; grid-template-columns: minmax(0,1fr); gap:var(--space); min-height:100dvh; padding:var(--space); box-sizing:border-box}
+    @media (min-width: 980px){
+      .app{grid-template-columns: 380px minmax(0,1fr)}
+    }
+
+    .panel{background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.00)); border:1px solid rgba(255,255,255,.06); border-radius: var(--radius); box-shadow: var(--shadow)}
+    .left{display:flex; flex-direction:column; gap:var(--space); padding:var(--space)}
+    .right{display:grid; grid-template-rows: auto 1fr; gap:var(--space); min-height: 50dvh}
+
+    h1{font-size:var(--text-lg); margin:0; letter-spacing:.2px; display:flex; align-items:center; gap:10px}
+    .pill{font-size:var(--text-sm); padding:6px 10px; background: rgba(255,255,255,.06); border-radius:999px; border:1px solid rgba(255,255,255,.08)}
+    .sub{font-size:var(--text-sm); color:var(--muted)}
+    .section{background: var(--panel); border-radius: 12px; padding:var(--space); box-shadow: inset 0 1px 0 rgba(255,255,255,.03), 0 6px 16px rgba(0,0,0,.25)}
+
+    .button{display:inline-flex; align-items:center; justify-content:center; gap:10px; padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.03)); color:var(--text); cursor:pointer; transition:.2s transform, .25s box-shadow, .2s background; text-decoration:none; user-select:none; font-size:var(--text-md); min-height:44px}
+    .button:hover{transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,.35)}
+    .button:active{transform: translateY(0)}
+    .button.primary{background: linear-gradient(180deg, rgba(124,242,211,.35), rgba(124,242,211,.12)); border-color: rgba(124,242,211,.55)}
+    .button.warn{background: linear-gradient(180deg, rgba(255,191,105,.35), rgba(255,191,105,.12)); border-color: rgba(255,191,105,.55)}
+    .button.danger{background: linear-gradient(180deg, rgba(255,107,107,.35), rgba(255,107,107,.12)); border-color: rgba(255,107,107,.55)}
+    .button.ghost{background: transparent}
+
+    .row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
+    .stack{display:flex; flex-direction:column; gap:8px}
+
+    .file-drop{border:1.5px dashed rgba(255,255,255,.2); border-radius:12px; padding:14px; text-align:center; color:var(--muted); transition:.2s}
+    .file-drop.drag{border-color: var(--brand); color:var(--brand); background: rgba(124,242,211,.06)}
+
+    input[type="file"]{display:none}
+    select, input[type="text"], input[type="number"], textarea{ width:100%; padding:12px; background: #0e1430; color: var(--text); border:1px solid rgba(255,255,255,.1); border-radius:10px; outline: none; transition:.2s border; font-size:var(--text-md)}
+    select:focus, input:focus, textarea:focus{ border-color: var(--accent)}
+
+    .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#111a39; border:1px solid rgba(255,255,255,.08); padding:2px 6px; border-radius:6px}
+    .grid{display:grid; grid-template-columns: 1fr; gap:10px}
+    @media (min-width:680px){ .grid{grid-template-columns: repeat(2, 1fr)} }
+
+    .video-wrap{position:relative; width:100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow:hidden; background: #0a0f24; border:1px solid rgba(255,255,255,.06)}
+    @media (min-width: 1200px){ .video-wrap{aspect-ratio: 21 / 9} }
+    video{width:100%; height:100%; object-fit:cover; filter: saturate(1.08) contrast(1.05)}
+    .scan-status{position:absolute; left:12px; bottom:12px; display:flex; gap:8px; align-items:center}
+    .pulse{width:10px; height:10px; border-radius:50%; background: var(--warn); box-shadow:0 0 0 0 rgba(255,191,105,.5); animation: pulse 1.6s infinite}
+    .pulse.on{background: var(--brand); box-shadow:0 0 0 0 rgba(124,242,211,.5)}
+    @keyframes pulse{0%{transform:scale(.9); box-shadow:0 0 0 0 rgba(255,255,255,.3)} 70%{transform:scale(1); box-shadow:0 0 0 16px rgba(255,255,255,0)} 100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+
+    .card{background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.00)); border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:var(--space); box-shadow: var(--shadow)}
+
+    /* Bloque resultado adaptable */
+    .result{display:grid; grid-template-columns: 1fr; gap:var(--space)}
+    @media (min-width:1200px){ .result{grid-template-columns: 1.1fr .9fr} }
+    .details{display:flex; flex-direction:column; gap:10px; overflow:auto; max-height: 42dvh}
+    .details table{width:100%; border-collapse: collapse}
+    .details th, .details td{font-size:var(--text-sm); text-align:left; padding:8px 8px; border-bottom:1px solid rgba(255,255,255,.06)}
+    .details tr:hover{background: rgba(255,255,255,.03)}
+
+    .chip{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font-size:var(--text-sm); border:1px solid rgba(255,255,255,.1)}
+    .chip.ok{background: rgba(56,217,150,.12); border-color: rgba(56,217,150,.45)}
+    .chip.bad{background: rgba(255,107,107,.12); border-color: rgba(255,107,107,.45)}
+
+    .log{overflow:auto; max-height: 60dvh}
+    .log table{width:100%; border-collapse: collapse}
+    .log th, .log td{font-size:var(--text-sm); padding:8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:left}
+    .log tr.added{animation: glow .9s ease-out}
+    @keyframes glow{0%{background: rgba(124,242,211,.22)} 100%{background: transparent}}
+
+    .tip{font-size:var(--text-sm); color:var(--muted)}
+    .hidden{display:none}
+
+    /* Barra fija de acciones en móvil */
+    .mobile-actions{position:sticky; bottom:0; display:flex; gap:10px; padding-top:10px; background: linear-gradient(180deg, transparent, rgba(0,0,0,.35));}
+    @media (min-width:980px){ .mobile-actions{display:none} }
+
+    /* Accesibilidad: reduce motion */
+    @media (prefers-reduced-motion: reduce){
+      *{animation:none!important; transition:none!important}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- LEFT: Controles (columna) -->
+    <aside class="panel left">
+      <div class="row">
+        <h1>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 2l2.3 4.7L19 7.3l-3.5 3.4.8 4.9L12 13.8l-4.3 1.8.8-4.9L5 7.3l4.7-.6L12 2z" stroke="url(#g1)" stroke-width="1.2"/>
+            <defs><linearGradient id="g1" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#7cf2d3"/><stop offset="1" stop-color="#9aa8ff"/></linearGradient></defs>
+          </svg>
+          Mini App Inventario
+        </h1>
+        <span class="pill" id="invCount" aria-live="polite">0 ítems</span>
+      </div>
+
+      <!-- Carga Inventario -->
+      <section class="section stack" aria-label="Carga de inventario">
+        <div class="row">
+          <strong>Archivo (CSV / XLSX)</strong>
+          <label class="button ghost" for="fileInput">Seleccionar</label>
+          <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
+        </div>
+        <div id="drop" class="file-drop" tabindex="0">Arrastrá y soltá el archivo aquí</div>
+        <div class="grid">
+          <div class="stack">
+            <label>Columna clave</label>
+            <select id="keySelect"></select>
+          </div>
+          <div class="stack">
+            <label>Filtro rápido</label>
+            <input id="filterInput" type="text" placeholder="Buscar en inventario" />
+          </div>
+        </div>
+        <div class="tip">Sugerencia: para uso 100% offline, preferí CSV (el soporte Excel usa un script CDN).</div>
+      </section>
+
+      <!-- Escáner -->
+      <section class="section stack" aria-label="Escáner de códigos">
+        <div class="row" style="gap:10px">
+          <strong>Escáner</strong>
+          <span class="chip" id="apiStatus">API: detectando…</span>
+        </div>
+        <div class="row" style="gap:8px">
+          <button class="button primary" id="startBtn">Iniciar cámara</button>
+          <button class="button warn" id="stopBtn" disabled>Detener</button>
+          <button class="button" id="flashBtn" disabled>Flash</button>
+          <button class="button" id="switchBtn" disabled>Cambiar</button>
+        </div>
+        <div class="stack">
+          <label>Ingreso manual</label>
+          <div class="row" style="gap:8px">
+            <input id="manualInput" type="text" placeholder="Pegá o escribí un código y Enter" />
+            <button class="button" id="manualBtn">OK</button>
+          </div>
+          <div class="tip">Atajo: <span class="kbd">Enter</span> confirma. <span class="kbd">Ctrl/Cmd + C</span> conforma.</div>
+        </div>
+        <div class="mobile-actions">
+          <button class="button primary" id="confirmBtnMobile" disabled>Conformar</button>
+          <button class="button" id="exportBtnMobile">Descargar CSV</button>
+        </div>
+      </section>
+
+      <!-- Exportación -->
+      <section class="section row" aria-label="Acciones">
+        <button class="button primary" id="exportBtn">Descargar "conformado.csv"</button>
+        <button class="button danger" id="clearBtn">Limpiar conformados</button>
+      </section>
+
+      <div class="sub">Hecho con ❤️ para flujos rápidos en depósito y control.</div>
+    </aside>
+
+    <!-- RIGHT: Escáner + resultados -->
+    <main class="right">
+      <!-- Video/Scanner Panel -->
+      <div class="panel video-wrap">
+        <video id="video" playsinline muted></video>
+        <div class="scan-status">
+          <div id="pulse" class="pulse" aria-hidden="true"></div>
+          <span id="scanLabel" class="pill">Cámara inactiva</span>
+        </div>
+      </div>
+
+      <!-- Results + Log -->
+      <div class="panel" style="display:grid; grid-template-columns: 1fr; gap:var(--space); padding:var(--space)">
+        <div class="result">
+          <div class="card details">
+            <div class="row">
+              <strong>Detalles del código</strong>
+              <span id="matchChip" class="chip" aria-live="polite">—</span>
+            </div>
+            <div class="stack">
+              <div class="row">
+                <div class="stack" style="flex:1; min-width: 200px">
+                  <label>Código detectado</label>
+                  <input id="detectedCode" type="text" readonly />
+                </div>
+                <div class="stack" style="width:min(340px, 100%)">
+                  <label>Acción</label>
+                  <div class="row" style="gap:8px">
+                    <button class="button primary" id="confirmBtn" disabled>Marcar como conformado</button>
+                    <button class="button ghost" id="copyBtn" title="Copiar código" disabled>Copiar</button>
+                  </div>
+                </div>
+              </div>
+              <div id="detailTableWrap" class="stack">
+                <label>Información asociada</label>
+                <div class="tip" id="noData">Cargá un inventario y elegí la columna clave para ver detalles.</div>
+                <div id="detailTable" class="hidden">
+                  <table id="detailTbl"></table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="row">
+              <strong>Inventario (vista rápida)</strong>
+              <span class="pill" id="visibleCount">0 visibles</span>
+            </div>
+            <div class="details" style="max-height: 28dvh">
+              <table id="invTbl"></table>
+            </div>
+          </div>
+        </div>
+        <div class="card log">
+          <div class="row">
+            <strong>Conformados</strong>
+            <span class="pill" id="confCount">0</span>
+          </div>
+          <table id="confTbl"></table>
+        </div>
+      </div>
+
+      <!-- Pruebas integradas -->
+      <div class="panel section" style="margin-top:var(--space)">
+        <details>
+          <summary>🧪 Pruebas rápidas (CSV/Export) – abrir para ejecutar</summary>
+          <div class="stack" style="margin-top:10px">
+            <button class="button" id="btnTestCSV">Test parser CSV</button>
+            <button class="button" id="btnTestExport">Test export CSV</button>
+            <div class="tip">Los resultados se muestran en la consola del navegador y/o como descarga de un archivo de prueba.</div>
+          </div>
+        </details>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Script principal -->
+  <script>
+  const state = {
+    inventory: [],
+    columns: [],
+    key: null,
+    index: new Map(),
+    conformados: [],
+    cameraDevices: [],
+    currentDeviceId: null,
+    scanning: false,
+    detector: null,
+    torchOn: false,
+    lastScan: { code: null, time: 0 },
+  };
+
+  // ---- Utilidades UI ----
+  const $ = sel => document.querySelector(sel);
+  const el = (tag, attrs={},{children=[]}={}) => { const n = document.createElement(tag); Object.entries(attrs).forEach(([k,v])=>{ if(k==="class") n.className=v; else if(k==="text") n.textContent=v; else n.setAttribute(k,v)}); children.forEach(c=> n.appendChild(c)); return n};
+  const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+  function setChip(id, text, ok=null){
+    const chip = $(id); chip.textContent = text;
+    chip.classList.remove('ok','bad');
+    if(ok===true) chip.classList.add('ok');
+    if(ok===false) chip.classList.add('bad');
+  }
+
+  function confetti(x=window.innerWidth/2,y=window.innerHeight/2){
+    const c = el('canvas',{style:`position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:9999`});
+    document.body.appendChild(c);
+    const ctx = c.getContext('2d'); c.width=innerWidth; c.height=innerHeight;
+    const parts = Array.from({length:120},()=>({x,y,vx:(Math.random()-0.5)*6,vy:(Math.random()*-6-3),w:2+Math.random()*3,h:6+Math.random()*6,rot:Math.random()*Math.PI,vr:(Math.random()-0.5)*.2,life:120+Math.random()*60, col:`hsl(${Math.random()*360},90%,70%)`}));
+    let tick=0; (function loop(){ ctx.clearRect(0,0,c.width,c.height); parts.forEach(p=>{ p.vy+=.12; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr; p.life--; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.col; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); });
+      if(++tick<180){ requestAnimationFrame(loop)} else c.remove(); })();
+  }
+
+  // ---- CSV Parser (ligero) ----
+  function parseCSV(text){
+    const rows = []; let cur = '', row = []; let inQ=false; for(let i=0;i<text.length;i++){
+      const ch=text[i], next=text[i+1];
+      if(ch==='"'){
+        if(inQ && next==='"'){ cur+='"'; i++; }
+        else inQ = !inQ;
+      } else if(ch===',' && !inQ){ row.push(cur); cur=''; }
+      else if((ch==='\n' || ch==='\r') && !inQ){ if(cur!=='' || row.length){ row.push(cur); rows.push(row); row=[]; cur=''; } }
+      else cur+=ch;
+    }
+    if(cur!=='' || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+
+  // ---- Lectura de archivos ----
+  async function loadFile(file){
+    const name = file.name.toLowerCase();
+    if(name.endsWith('.csv')){
+      const text = await file.text();
+      const rows = parseCSV(text).filter(r=> r.length && r.some(c=>c!==''));
+      hydrateInventory(rows);
+    } else if(name.endsWith('.xlsx') || name.endsWith('.xls')){
+      await ensureSheetJS();
+      if(!window.XLSX){ alert('No se pudo cargar el lector de Excel. Exportá a CSV y volvé a intentar.'); return; }
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      hydrateInventory(rows);
+    } else {
+      alert('Formato no soportado. Usá CSV o Excel (.xlsx).');
+    }
+  }
+
+  function hydrateInventory(rows){
+    if(!rows.length){ alert('El archivo está vacío.'); return; }
+    const [header, ...data] = rows;
+    state.columns = header.map(h=> String(h||'col').trim());
+    state.inventory = data.filter(r=> r.some(c=>String(c).trim()!==''))
+                          .map(r=> Object.fromEntries(state.columns.map((c,i)=>[c, r[i]??''])));
+    // Detectar columna probable de código
+    const lc = state.columns.map(c=>c.toLowerCase());
+    const guess = ['codigo','código','barcode','barra','ean','sku','id','inventario','cod_barra','code'].find(k=> lc.includes(k));
+    state.key = guess || state.columns[0];
+    rebuildIndex();
+    paintInventory();
+    fillKeySelect();
+    $('#invCount').textContent = `${state.inventory.length} ítems`;
+  }
+
+  function rebuildIndex(){
+    state.index = new Map();
+    for(const row of state.inventory){
+      const code = String(row[state.key] ?? '').trim();
+      if(code) state.index.set(code, row);
+    }
+  }
+
+  function fillKeySelect(){
+    const sel = $('#keySelect'); sel.innerHTML = '';
+    state.columns.forEach(c=> sel.appendChild(el('option',{value:c, text:c})));
+    sel.value = state.key;
+  }
+
+  function paintInventory(){
+    const tbl = $('#invTbl'); tbl.innerHTML = '';
+    const head = el('tr');
+    const cols = state.columns.slice(0, 6);
+    cols.forEach(c=> head.appendChild(el('th',{text:c})));
+    tbl.appendChild(head);
+    const filter = $('#filterInput').value.toLowerCase();
+    let visible = 0;
+    for(const row of state.inventory){
+      const line = cols.map(c=> String(row[c]??'')).join(' ').toLowerCase();
+      if(filter && !line.includes(filter)) continue;
+      visible++;
+      const tr = el('tr');
+      cols.forEach(c=> tr.appendChild(el('td',{text:String(row[c]??'')})));
+      tbl.appendChild(tr);
+    }
+    $('#visibleCount').textContent = `${visible} visibles`;
+  }
+
+  // ---- Cámara y BarcodeDetector ----
+  async function initDevices(){
+    try{
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      state.cameraDevices = devs.filter(d=> d.kind==='videoinput');
+      $('#switchBtn').disabled = state.cameraDevices.length<2;
+    }catch(e){ console.warn(e); }
+  }
+
+  async function startCamera(){
+    try{
+      const constraints = { video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} } };
+      if(state.currentDeviceId) constraints.video.deviceId = {exact: state.currentDeviceId};
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const v = $('#video'); v.srcObject = stream; await v.play();
+      $('#pulse').classList.add('on'); $('#scanLabel').textContent = 'Escaneando…';
+      $('#startBtn').disabled = true; $('#stopBtn').disabled = false; $('#flashBtn').disabled = false;
+      state.scanning = true; detectLoop();
+    }catch(e){ alert('No se pudo acceder a la cámara. Revisá permisos.'); console.error(e); }
+  }
+
+  function stopCamera(){
+    const v = $('#video'); const s = v.srcObject; if(s){ s.getTracks().forEach(t=>t.stop()); v.srcObject=null; }
+    $('#pulse').classList.remove('on'); $('#scanLabel').textContent = 'Cámara inactiva';
+    $('#startBtn').disabled = false; $('#stopBtn').disabled = true; $('#flashBtn').disabled = true;
+    state.scanning = false;
+  }
+
+  async function toggleTorch(){
+    const track = $('#video').srcObject?.getVideoTracks?.()[0];
+    if(!track) return;
+    const caps = track.getCapabilities?.()||{}; if(!caps.torch){ return alert('El flash no está disponible en este dispositivo.'); }
+    state.torchOn = !state.torchOn;
+    await track.applyConstraints({ advanced: [{ torch: state.torchOn }] });
+    $('#flashBtn').textContent = state.torchOn? 'Flash (ON)' : 'Flash';
+  }
+
+  async function switchCamera(){
+    if(state.cameraDevices.length<2) return;
+    const idx = state.cameraDevices.findIndex(d=> d.deviceId===state.currentDeviceId);
+    const next = state.cameraDevices[(idx+1) % state.cameraDevices.length];
+    state.currentDeviceId = next.deviceId; stopCamera(); startCamera();
+  }
+
+  // Throttle de detección para mejorar rendimiento en móvil
+  let _lastDetectTs = 0;
+  const DETECT_EVERY_MS = 250;
+
+  async function detectLoop(){
+    if(!state.scanning) return;
+    try{
+      if(!state.detector){
+        if('BarcodeDetector' in window){
+          const formats = ['code_128','ean_13','ean_8','upc_a','upc_e','code_39','code_93','itf','codabar','qr_code','data_matrix','pdf417'];
+          state.detector = new BarcodeDetector({formats});
+          setChip('#apiStatus','API: BarcodeDetector', true);
+        } else {
+          setChip('#apiStatus','API: no disponible (usá ingreso manual)', false);
+        }
+      }
+      const now = performance.now();
+      if(state.detector && (now - _lastDetectTs) > DETECT_EVERY_MS){
+        _lastDetectTs = now;
+        const v = $('#video');
+        if(v.readyState >= 2){
+          const bitmap = await createImageBitmap(v);
+          const codes = await state.detector.detect(bitmap);
+          bitmap.close?.();
+          if(codes && codes.length){ onDetect(codes[0].rawValue || codes[0].displayValue); }
+        }
+      }
+    }catch(e){ /* silencioso */ }
+    requestAnimationFrame(detectLoop);
+  }
+
+  function onDetect(code){
+    code = String(code||'').trim(); if(!code) return;
+    // Anti-rebote: evita repetir el mismo código por 3s
+    const now = Date.now();
+    if(state.lastScan.code===code && (now - state.lastScan.time) < 3000) return;
+    state.lastScan = { code, time: now };
+
+    $('#detectedCode').value = code; $('#copyBtn').disabled = false; $('#confirmBtn').disabled = false; $('#confirmBtnMobile').disabled = false;
+    const row = state.index.get(code);
+    if(row){
+      setChip('#matchChip','Coincide en inventario', true);
+      paintDetails(row);
+      flashOK();
+    } else {
+      setChip('#matchChip','No encontrado en inventario', false);
+      clearDetails();
+      flashWarn();
+    }
+  }
+
+  function paintDetails(row){
+    $('#noData').classList.add('hidden'); $('#detailTable').classList.remove('hidden');
+    const tbl = $('#detailTbl'); tbl.innerHTML='';
+    for(const c of state.columns){
+      const tr = el('tr'); tr.appendChild(el('th',{text:c})); tr.appendChild(el('td',{text:String(row[c]??'')})); tbl.appendChild(tr);
+    }
+  }
+  function clearDetails(){ $('#detailTbl').innerHTML=''; $('#detailTable').classList.add('hidden'); $('#noData').classList.remove('hidden'); }
+
+  function flashOK(){
+    const card = document.querySelector('.details'); card.style.boxShadow='0 0 0 2px rgba(56,217,150,.5)'; setTimeout(()=> card.style.boxShadow='', 320);
+  }
+  function flashWarn(){
+    const card = document.querySelector('.details'); card.style.boxShadow='0 0 0 2px rgba(255,191,105,.6)'; setTimeout(()=> card.style.boxShadow='', 320);
+  }
+
+  function addConformado(code){
+    const ts = new Date().toISOString();
+    const row = state.index.get(String(code)) || null;
+    // Evitar duplicados exactos por código
+    if(state.conformados.some(x=> x.codigo===code)) return;
+    const rec = { codigo: code, timestamp: ts };
+    if(row){ for(const c of state.columns){ rec[c] = row[c]??''; } rec._match = '1'; }
+    else { rec._match = '0'; }
+    state.conformados.unshift(rec);
+    persistConformados();
+    paintConformados();
+    confetti(window.innerWidth-180, 140);
+  }
+
+  function paintConformados(){
+    const tbl = $('#confTbl'); tbl.innerHTML='';
+    const cols = ['timestamp','codigo','_match', ...state.columns.slice(0,4)];
+    const head = el('tr'); cols.forEach(c=> head.appendChild(el('th',{text:c}))); tbl.appendChild(head);
+    for(const rec of state.conformados){
+      const tr = el('tr'); tr.classList.add('added');
+      cols.forEach(c=> tr.appendChild(el('td',{text:String(rec[c]??'')})));
+      tbl.appendChild(tr);
+    }
+    $('#confCount').textContent = state.conformados.length;
+  }
+
+  function exportCSV(){
+    if(!state.conformados.length){ alert('No hay registros para exportar.'); return; }
+    const cols = Array.from(new Set(['timestamp','codigo','_match', ...state.columns]));
+    const esc=v=> '"'+String(v??'').replace(/"/g,'""')+'"';
+    const lines = [cols.map(esc).join(',')];
+    state.conformados.forEach(rec=>{ lines.push(cols.map(c=> esc(rec[c])).join(',')); });
+    const blob = new Blob([lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = el('a',{href:url, download:'conformado.csv'}); document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+
+  function persistConformados(){
+    try{ localStorage.setItem('conformados_v1', JSON.stringify(state.conformados)); }catch{}
+  }
+  function restoreConformados(){
+    try{ const v = JSON.parse(localStorage.getItem('conformados_v1')||'[]'); if(Array.isArray(v)) state.conformados = v; }catch{}
+    paintConformados();
+  }
+
+  async function ensureSheetJS(){
+    if(window.XLSX) return;
+    await new Promise((resolve)=>{
+      const s = document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload=resolve; s.onerror=resolve; document.head.appendChild(s);
+    });
+  }
+
+  // ---- Eventos ----
+  document.addEventListener('DOMContentLoaded', async ()=>{
+    restoreConformados();
+    await initDevices();
+    $('#keySelect').addEventListener('change', e=>{ state.key = e.target.value; rebuildIndex(); });
+    $('#filterInput').addEventListener('input', paintInventory);
+
+    // Drag & drop
+    const drop = $('#drop');
+    const handleLoad = e=>{ e.preventDefault(); drop.classList.remove('drag'); const f = (e.dataTransfer||{}).files?.[0]; if(f) loadFile(f); };
+    drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag'); });
+    drop.addEventListener('dragleave', ()=> drop.classList.remove('drag'));
+    drop.addEventListener('drop', handleLoad);
+
+    // También click / Enter sobre el área de drop
+    drop.addEventListener('click', ()=> $('#fileInput').click());
+    drop.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); $('#fileInput').click(); } });
+
+    // File input
+    $('#fileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) loadFile(f); e.target.value=''; });
+
+    // Scanner
+    $('#startBtn').addEventListener('click', startCamera);
+    $('#stopBtn').addEventListener('click', stopCamera);
+    $('#flashBtn').addEventListener('click', toggleTorch);
+    $('#switchBtn').addEventListener('click', switchCamera);
+
+    // Manual input
+    const manual = ()=>{ const v = $('#manualInput').value.trim(); if(!v) return; onDetect(v); $('#manualInput').value=''; };
+    $('#manualBtn').addEventListener('click', manual);
+    $('#manualInput').addEventListener('keydown', e=>{ if(e.key==='Enter') manual(); });
+
+    // Actions
+    const confirmAction = ()=>{ const code = $('#detectedCode').value; if(!code) return; addConformado(code); };
+    $('#confirmBtn').addEventListener('click', confirmAction);
+    $('#confirmBtnMobile').addEventListener('click', confirmAction);
+    $('#copyBtn').addEventListener('click', ()=>{ const code=$('#detectedCode').value; if(code) navigator.clipboard.writeText(code); });
+    $('#exportBtn').addEventListener('click', exportCSV);
+    $('#exportBtnMobile').addEventListener('click', exportCSV);
+    $('#clearBtn').addEventListener('click', ()=>{ if(confirm('¿Vaciar la lista de conformados?')){ state.conformados=[]; persistConformados(); paintConformados(); }});
+
+    // Atajo global para confirmar rápido
+    document.addEventListener('keydown', e=>{ if(e.key==='c' && (e.ctrlKey||e.metaKey)) $('#confirmBtn').click(); });
+
+    // ===== Pruebas =====
+    $('#btnTestCSV').addEventListener('click', ()=>{
+      const sample = 'codigo,desc,qty\r\n123,Item A,5\r\n"124,7",Item B,10\r\n125,"Item, C",0\r\n';
+      const rows = parseCSV(sample);
+      console.assert(rows.length===4, 'Debería parsear 4 filas contando header');
+      console.assert(rows[1][0]==='123', 'Fila 1 código 123');
+      console.assert(rows[2][0]==='124,7', 'Campo con coma entre comillas');
+      console.assert(rows[3][1]==='Item, C', 'Descripción con coma entre comillas');
+      console.log('✅ Test CSV OK', rows);
+    });
+
+    $('#btnTestExport').addEventListener('click', ()=>{
+      state.columns = ['codigo','desc'];
+      state.conformados = [
+        {timestamp:'2025-10-22T12:00:00Z', codigo:'ABC', _match:'1', codigo:'ABC', desc:'Algo'},
+        {timestamp:'2025-10-22T12:01:00Z', codigo:'XYZ', _match:'0', codigo:'XYZ', desc:'Otra'}
+      ];
+      exportCSV();
+      console.log('✅ Test export OK (deberías ver un archivo descargado)');
+    });
+  });
+  </script>
+</body>
+</html>
